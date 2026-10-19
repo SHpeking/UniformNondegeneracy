@@ -36,29 +36,29 @@ theorem potential_nonneg (hLyapunov : HasLyapunovBounds C r P) (t : ℕ) :
 theorem potential_antitone (hLyapunov : HasLyapunovBounds C r P) :
     Antitone P := by
   apply antitone_nat_of_succ_le
-  intro n
-  linarith [hLyapunov.sufficient_decrease n, sq_nonneg (r n)]
+  intro t
+  linarith [hLyapunov.sufficient_decrease t, sq_nonneg (r t)]
 
 theorem tail (hLyapunov : HasLyapunovBounds C r P) (t₀ : ℕ) :
     HasLyapunovBounds C (fun t => r (t₀ + t)) (fun t => P (t₀ + t)) := by
   refine ⟨hLyapunov.one_le_comparison, ?_, ?_, ?_, ?_⟩
-  · exact fun i => hLyapunov.residual_nonneg (t₀ + i)
-  · exact fun i => hLyapunov.residual_sq_le_potential (t₀ + i)
-  · exact fun i => hLyapunov.potential_le_residual_sq (t₀ + i)
-  · exact fun i => hLyapunov.sufficient_decrease (t₀ + i)
+  · exact fun t => hLyapunov.residual_nonneg (t₀ + t)
+  · exact fun t => hLyapunov.residual_sq_le_potential (t₀ + t)
+  · exact fun t => hLyapunov.potential_le_residual_sq (t₀ + t)
+  · exact fun t => hLyapunov.sufficient_decrease (t₀ + t)
 
 /-- The initial decrease improves the telescoping bound from `C` to `C - 1`. -/
 theorem sum_residual_sq_le (hLyapunov : HasLyapunovBounds C r P) (t₀ T : ℕ) :
-    (∑ j ∈ Finset.range T, (r (t₀ + j + 1)) ^ 2) ≤ (C - 1) * (r t₀) ^ 2 := by
-  have htelescope : ∀ n : ℕ,
-      (∑ j ∈ Finset.range n, (r (t₀ + j + 1)) ^ 2) ≤ P (t₀ + 1) - P (t₀ + n + 1) := by
-    intro n
-    induction n with
+    (∑ t ∈ Finset.range T, (r (t₀ + t + 1)) ^ 2) ≤ (C - 1) * (r t₀) ^ 2 := by
+  have htelescope : ∀ T₁ : ℕ,
+      (∑ t ∈ Finset.range T₁, (r (t₀ + t + 1)) ^ 2) ≤ P (t₀ + 1) - P (t₀ + T₁ + 1) := by
+    intro T₁
+    induction T₁ with
     | zero => simp
-    | succ n ih =>
+    | succ T₁ ih =>
       rw [Finset.sum_range_succ]
-      have hd := hLyapunov.sufficient_decrease (t₀ + n + 1)
-      have he : t₀ + (n + 1) + 1 = t₀ + n + 1 + 1 := by omega
+      have hd := hLyapunov.sufficient_decrease (t₀ + T₁ + 1)
+      have he : t₀ + (T₁ + 1) + 1 = t₀ + T₁ + 1 + 1 := by omega
       rw [he]
       linarith
   have h := htelescope T
@@ -74,12 +74,12 @@ theorem exists_residual_sq_le (hLyapunov : HasLyapunovBounds C r P)
       (r t) ^ 2 ≤ ((C - 1) / (T : ℝ)) * (r t₀) ^ 2 := by
   have hNum : (0 : ℝ) < T := by exact_mod_cast hT_pos
   by_contra! h
-  have hsum : (∑ j ∈ Finset.range T, ((C - 1) / (T : ℝ)) * (r t₀) ^ 2) <
-      ∑ j ∈ Finset.range T, (r (t₀ + j + 1)) ^ 2 := by
+  have hsum : (∑ t ∈ Finset.range T, ((C - 1) / (T : ℝ)) * (r t₀) ^ 2) <
+      ∑ t ∈ Finset.range T, (r (t₀ + t + 1)) ^ 2 := by
     apply Finset.sum_lt_sum_of_nonempty
     · exact Finset.nonempty_range_iff.mpr (Nat.ne_of_gt hT_pos)
-    · intro j hj
-      exact h (t₀ + j + 1) (by omega) (by have := Finset.mem_range.mp hj; omega)
+    · intro t hj
+      exact h (t₀ + t + 1) (by omega) (by have := Finset.mem_range.mp hj; omega)
   simp only [Finset.sum_const, Finset.card_range, nsmul_eq_mul] at hsum
   have he : (T : ℝ) * ((C - 1) / (T : ℝ) * (r t₀) ^ 2) = (C - 1) * (r t₀) ^ 2 := by field_simp
   rw [he] at hsum
@@ -107,10 +107,10 @@ theorem exists_residual_le_geometric (hLyapunov : HasLyapunovBounds C r P)
   | zero => exact ⟨0, by simp, by simp⟩
   | succ B ih =>
     obtain ⟨t, hi, hr⟩ := ih
-    obtain ⟨next, hn, hn', hr'⟩ := hLyapunov.exists_residual_le_half W hW_pos hWindow t
-    refine ⟨next, ?_, ?_⟩
+    obtain ⟨t₁, hn, hn', hr'⟩ := hLyapunov.exists_residual_le_half W hW_pos hWindow t
+    refine ⟨t₁, ?_, ?_⟩
     · calc
-        next ≤ t + W := hn'
+        t₁ ≤ t + W := hn'
         _ ≤ B * W + W := Nat.add_le_add_right hi _
         _ = (B + 1) * W := by ring
     · rw [pow_succ]

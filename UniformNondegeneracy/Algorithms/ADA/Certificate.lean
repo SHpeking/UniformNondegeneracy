@@ -37,8 +37,8 @@ theorem hasLyapunovBounds_of_isUN (hUN : IsUN bounds E g)
     (hAdmissible : Admissible bounds Λ)
     (hOrder : Λ.tauMinus ≤ Λ.tauPlus) (x₀ : H) :
     HasLyapunovBounds (3 * kappa bounds Λ + 2)
-      (fun index => ‖g (cycleStart g Λ x₀ index)‖)
-      (fun index => normalizedEnergy E g Λ (kappa bounds Λ) (stationaryValue E g) (cycleStart g Λ x₀ index)) := by
+      (fun t => ‖g (cycleStart g Λ x₀ t)‖)
+      (fun t => normalizedEnergy E g Λ (kappa bounds Λ) (stationaryValue E g) (cycleStart g Λ x₀ t)) := by
   exact (lyapunovInputs_of_isUN hUN hAdmissible).hasLyapunovBounds hOrder x₀
 
 end UN.ADA
