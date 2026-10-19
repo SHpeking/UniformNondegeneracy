@@ -10,9 +10,9 @@ public import UniformNondegeneracy.Analysis.ResidualDecay
 open scoped RealInnerProductSpace
 
 /-!
-# Algebraic corrected-energy analysis
+# Corrected energy and Lyapunov bounds
 
-This module does not import envelopes, duality, or `DAI.FromUN`. Its inputs explicitly include Bregman bounds and signed PL bounds, as well as DAI. `ADA.Certificate` later derives those inputs from the UN secants.
+The normalized corrected energy is comparable to the squared gradient norm and decreases by at least the current squared gradient norm over each descent–ascent cycle. These estimates follow from Bregman, signed PL, and DAI bounds when the descent step is at least as large as the ascent step.
 -/
 
 noncomputable section
@@ -23,7 +23,7 @@ open DAI
 
 variable {H : Type*} [NormedAddCommGroup H] [InnerProductSpace ℝ H]
 
-/-- Geometric facts actually consumed by the corrected-energy calculation. The effective inner bounds belong to the chosen scales, not necessarily the original μ parameters. `Eref` is the reference energy supplied to this algebraic interface; `ADA.Certificate` specializes it to the stationary value. -/
+/-- Bregman and DAI bounds, together with signed PL bounds relative to `Eref`. -/
 structure LyapunovInputs (bounds : CurvatureBounds) (E : H → ℝ) (g : H → H)
     (Λ : Scales) (hAdmissible : Admissible bounds Λ)
     (Eref : ℝ) : Prop where
@@ -32,7 +32,7 @@ structure LyapunovInputs (bounds : CurvatureBounds) (E : H → ℝ) (g : H → H
   signed_pl_upper : ∀ x, E x - Eref ≤ ‖g x‖ ^ 2 / (2 * effectiveMuPlus bounds Λ)
   dai : HasDAI E g Λ hAdmissible.canonicalWeights
 
-/-- W(y), the corrected energy for one descent–ascent cycle. The coefficient is κ-1, avoiding division by q at the endpoint κ=1. -/
+/-- The corrected energy $W(y)$ combines the energy gap, descent Bregman difference, and squared ascent displacement. -/
 def correctedEnergy (E : H → ℝ) (g : H → H) (Λ : Scales)
     (κ Eref : ℝ) (y : H) : ℝ :=
   let z := descentStep g Λ y
@@ -41,10 +41,14 @@ def correctedEnergy (E : H → ℝ) (g : H → H) (Λ : Scales)
     (Λ.tauMinus / Λ.tauPlus) * (κ - 1) * phiPlus E g Λ z y +
     ‖yNext - z‖ ^ 2 / 2
 
-/-- P(y)=2W(y)/τ₊²; this normalization produces the scalar certificate. -/
+/-- The normalized potential $P(y) = 2W(y)/\tau_{+}^{2}$. -/
 def normalizedEnergy (E : H → ℝ) (g : H → H) (Λ : Scales)
     (κ Eref : ℝ) (y : H) : ℝ :=
   2 * correctedEnergy E g Λ κ Eref y / Λ.tauPlus ^ 2
+
+/-!
+## Scalar comparison estimates
+-/
 
 section ScalarEstimates
 
@@ -55,7 +59,7 @@ local notation "τ₋" => τMinus
 local notation "μEff₊" => μEffPlus
 local notation "μEff₋" => μEffMinus
 
-/-- Scalar lower estimate after substituting the descent Bregman identity. `τ₊`, `τ₋` are step sizes and `μEff₊`, `μEff₋` are the effective inner bounds. `e_y`, `e_z` are energy gaps, `G_y`, `G_z` are squared gradient norms, and `Φ` is the descent Bregman difference. -/
+/-- Scalar lower bound for the corrected energy. `e_y`, `e_z` are energy gaps, `G_y`, `G_z` are squared gradient norms, and `Φ` is the descent Bregman difference. -/
 private theorem lower_scalar_bound (e_y e_z G_y G_z Φ : ℝ)
     (hτPlus_pos : 0 < τ₊) (hτMinus_pos : 0 < τ₋)
     (hμEffMinus_pos : 0 < μEff₋)
@@ -86,7 +90,7 @@ private theorem lower_scalar_bound (e_y e_z G_y G_z Φ : ℝ)
   simp only [div_eq_mul_inv, mul_inv_rev] at hFa hpla hHc ⊢
   nlinarith only [hEnergy, hFa, hpla, hHc]
 
-/-- Scalar upper estimate using the larger-first-step ordering. -/
+/-- Scalar upper bound when the descent step is at least as large as the ascent step. -/
 private theorem upper_scalar_bound (e_y G_y G_z Φ : ℝ)
     (hτPlus_pos : 0 < τ₊) (hτMinus_pos : 0 < τ₋)
     (hμEffPlus_pos : 0 < μEff₊)
@@ -146,6 +150,10 @@ local notation "Φ₊" => phiPlus E g Λ
 local notation "Φ₋" => phiMinus E g Λ
 local notation "P" => normalizedEnergy E g Λ κ Eref
 
+/-!
+## Comparison with the squared gradient norm
+-/
+
 private theorem phi_descent_gradient (hInputs : LyapunovInputs bounds E g Λ hAdmissible Eref)
     (x : H) :
     τ₊ ^ 2 * ‖g (descentStep g Λ x)‖ ^ 2 ≤ 2 * (1 + τ₊ / τ₋) * Φ₊ (descentStep g Λ x) x := by
@@ -173,6 +181,7 @@ private theorem corrected_energy_identity (x : H) :
     real_inner_smul_right, real_inner_self_eq_norm_sq]
   ring
 
+/-- The squared gradient norm is a lower bound for the normalized corrected energy. -/
 theorem residual_sq_le_normalizedEnergy
     (hInputs : LyapunovInputs bounds E g Λ hAdmissible Eref) (x : H) :
     ‖g x‖ ^ 2 ≤ P x := by
@@ -204,6 +213,7 @@ theorem residual_sq_le_normalizedEnergy
   simp only [norm_smul, Real.norm_eq_abs, mul_pow, sq_abs]
   nlinarith only [h]
 
+/-- The normalized corrected energy is at most `3 * κ + 2` times the squared gradient norm. -/
 theorem normalizedEnergy_le_residual_sq
     (hInputs : LyapunovInputs bounds E g Λ hAdmissible Eref)
     (hOrder : τ₋ ≤ τ₊) (x : H) :
@@ -252,6 +262,10 @@ theorem normalizedEnergy_le_residual_sq
   simp only [norm_smul, Real.norm_eq_abs, mul_pow, sq_abs]
   nlinarith only [h]
 
+/-!
+## Decrease over a descent–ascent cycle
+-/
+
 private theorem decrease_phiPlus_symm (x₁ x₂ : H) :
     Φ₊ x₁ x₂ + Φ₊ x₂ x₁ = ⟪descentStep g Λ x₁ - descentStep g Λ x₂, x₁ - x₂⟫ := by
   unfold phiPlus bregman descentStep gradientStep
@@ -266,6 +280,7 @@ private theorem decrease_phiMinus_symm (x₁ x₂ : H) :
     real_inner_smul_left, real_inner_self_eq_norm_sq, real_inner_comm x₂ x₁]
   ring
 
+/-- One descent–ascent cycle decreases the normalized corrected energy by at least the starting squared gradient norm. -/
 theorem normalizedEnergy_decrease
     (hInputs : LyapunovInputs bounds E g Λ hAdmissible Eref)
     (hOrder : τ₋ ≤ τ₊) (y : H) :
@@ -401,7 +416,7 @@ theorem normalizedEnergy_decrease
   apply (le_div_iff₀ (sq_pos_of_pos hτPlus_pos)).mpr
   nlinarith only [hphi, hhalf, henergy]
 
-/-- Assembly only: apply the three pointwise inequalities along the cycle. -/
+/-- The normalized corrected energy satisfies the Lyapunov bounds along ADA cycles. -/
 theorem hasLyapunovBounds
     (hInputs : LyapunovInputs bounds E g Λ hAdmissible Eref)
     (hOrder : τ₋ ≤ τ₊) (x₀ : H) :

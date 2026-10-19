@@ -1,19 +1,16 @@
 module
 
-public import UniformNondegeneracy.Geometry.Duality
+public import UniformNondegeneracy.Geometry.Basic
+public import UniformNondegeneracy.Geometry.InverseEnergy
 
 @[expose] public section
 
 open scoped RealInnerProductSpace
 
 /-!
-# Interior two-sided envelopes
+# Two-sided envelopes and resolvents
 
-This file uses real-valued envelopes only at parameters in the open interval `(-1 / L₋, 1 / L₊)`. The resolvent is obtained from the independent `GradientMap.surjective_of_bounds` theorem applied to the gradient of `‖x‖² / 2 - s * E x`.
-
-The definitions below are total Lean functions. Outside `envelopeDomain`, their chosen-inverse formulas are not asserted to equal an envelope supremum. Boundary scales in the final DAI theorem are handled by a limit in a finite inequality; no extended-real endpoint envelope is needed in the main dependency chain.
-
-Reference: arXiv:2610.06115v1, Section 2.1, equations (12)--(14).
+For a UN energy, the resolvent gives the unique envelope maximizer and determines the spatial and parameter derivatives. The gradient step is the unique minimizer of the envelope's proximal objective.
 -/
 
 noncomputable section
@@ -25,11 +22,11 @@ namespace UN
 
 variable {H : Type*} [NormedAddCommGroup H] [InnerProductSpace ℝ H] [CompleteSpace H]
 
-/-- `Jₛ = (I - s g)⁻¹`, using the chosen inverse of the displayed map. The direct formula keeps envelope analysis independent of algorithm modules. -/
+/-- The resolvent `Jₛ = (I - s g)⁻¹`. -/
 def resolvent (g : H → H) (s : ℝ) : H → H :=
   Function.invFun (fun x => x - s • g x)
 
-/-- Parameters for which the two-sided envelope has a unique finite maximizer. -/
+/-- The envelope parameter interval determined by the outer curvature bounds. -/
 def envelopeDomain (bounds : CurvatureBounds) : Set ℝ :=
   Set.Ioo (-1 / bounds.lMinus) (1 / bounds.lPlus)
 
@@ -37,7 +34,7 @@ def envelopeDomain (bounds : CurvatureBounds) : Set ℝ :=
 def envelopeObjective (E : H → ℝ) (g : H → H) (s : ℝ) (x ξ : H) : ℝ :=
   s * (E ξ - stationaryValue E g) - (1 / 2 : ℝ) * ‖ξ - x‖ ^ 2
 
-/-- The envelope evaluated at its resolvent optimizer. This formula agrees with the supremum only under UN and the open-domain hypothesis. -/
+/-- The envelope objective evaluated at the resolvent. -/
 def interiorEnvelope (E : H → ℝ) (g : H → H) (s : ℝ) (x : H) : ℝ :=
   envelopeObjective E g s x (resolvent g s x)
 
@@ -45,7 +42,7 @@ def interiorEnvelope (E : H → ℝ) (g : H → H) (s : ℝ) (x : H) : ℝ :=
 def resolventPotential (E : H → ℝ) (s : ℝ) : H → ℝ :=
   fun x => (1 / 2 : ℝ) * ‖x‖ ^ 2 - s * E x
 
-/-- A positive strong-monotonicity modulus on the interior parameter domain. -/
+/-- Lower bound for the directional secants of `I - s g`. -/
 def resolventModulus (bounds : CurvatureBounds) (s : ℝ) : ℝ :=
   min (1 - s * bounds.lPlus) (1 + s * bounds.lMinus)
 
@@ -58,6 +55,10 @@ local notation "xStar" => stationaryPoint g
 local notation "EStar" => stationaryValue E g
 local notation "J" => resolvent g
 local notation "M" => interiorEnvelope E g
+
+/-!
+## Resolvent properties
+-/
 
 theorem resolventModulus_pos {s : ℝ} (hs : s ∈ envelopeDomain bounds) :
     0 < resolventModulus bounds s := by
@@ -80,7 +81,6 @@ theorem hasGradientAt_resolventPotential (hUN : IsUN bounds E g)
   ext v
   simp [InnerProductSpace.toDual_apply_apply]
 
-/-- Derive this from the one-sided inner-product consequences of the outer secant. Cauchy--Schwarz then gives the lower norm bound needed for inversion. -/
 theorem resolventMap_strong_monotonicity (hUN : IsUN bounds E g)
     (s : ℝ)
     (x₁ x₂ : H) :
@@ -124,7 +124,6 @@ theorem resolventMap_upper_norm (hUN : IsUN bounds E g)
       exact hUN.norm_sub_le_upper x₁ x₂
     _ = _ := by ring
 
-/-- The Hilbert-space gradient inversion theorem applied to `resolventPotential`. -/
 theorem resolventMap_bijective (hUN : IsUN bounds E g)
     {s : ℝ} (hs : s ∈ envelopeDomain bounds) :
     Function.Bijective (fun x => x - s • g x) := by
@@ -170,7 +169,6 @@ theorem resolvent_continuous (hUN : IsUN bounds E g)
   simp only [dist_eq_norm]
   exact_mod_cast hUN.resolvent_norm_sub_le hs x₁ x₂
 
-/-- Parameter continuity follows from the resolvent equation and the locally uniform positive lower bound for `resolventModulus`. -/
 theorem resolvent_parameter_continuousAt (hUN : IsUN bounds E g)
     {s : ℝ} (hs : s ∈ envelopeDomain bounds) (x : H) :
     ContinuousAt (fun s₁ => J s₁ x) s := by
@@ -199,7 +197,11 @@ theorem resolvent_parameter_continuousAt (hUN : IsUN bounds E g)
     hm.mul (((continuousAt_id.sub continuousAt_const).abs).mul continuousAt_const)
   simpa only [sub_self, abs_zero, zero_mul, mul_zero] using hc.tendsto
 
-/-- The defining formula really is the maximum of the envelope objective. -/
+/-!
+## Envelope maximization
+-/
+
+/-- The objective gap controls the squared distance to the resolvent. -/
 theorem envelopeObjective_gap (hUN : IsUN bounds E g)
     {s : ℝ} (hs : s ∈ envelopeDomain bounds)
     (x ξ : H) :
@@ -258,14 +260,18 @@ theorem envelopeObjective_eq_iff (hUN : IsUN bounds E g)
   · rintro rfl
     rfl
 
-/-- The stationary trial point gives the simple lower bound used by Lemma 8. -/
+/-- The stationary point as a trial point gives a lower bound on the envelope. -/
 theorem interiorEnvelope_lower (hUN : IsUN bounds E g)
     {s : ℝ} (hs : s ∈ envelopeDomain bounds) (x : H) :
     -(1 / 2 : ℝ) * ‖x - xStar‖ ^ 2 ≤ M s x := by
   simpa [envelopeObjective, stationaryValue, norm_sub_rev] using
     hUN.envelopeObjective_le_interiorEnvelope hs x xStar
 
-/-- The spatial derivative follows from inverse-energy differentiation and the resolvent Lipschitz estimate; no derivative of the inverse map is required. -/
+/-!
+## Spatial and parameter derivatives
+-/
+
+/-- The spatial gradient of the envelope is `J s x - x`. -/
 theorem hasGradientAt_interiorEnvelope (hUN : IsUN bounds E g)
     {s : ℝ} (hs : s ∈ envelopeDomain bounds) (x : H) :
     HasGradientAt (M s) (J s x - x) x := by
@@ -280,13 +286,13 @@ theorem hasGradientAt_interiorEnvelope (hUN : IsUN bounds E g)
   rw [hasGradientAt_iff_hasFDerivAt]
   convert! (hd.hasFDerivAt.sub hn.hasFDerivAt).sub_const (s * EStar) using 1
   · funext x'
-    simp only [interiorEnvelope, envelopeObjective, resolventPotential, norm_sub_sq_real, Pi.sub_apply]
+    simp only [interiorEnvelope, envelopeObjective, inverseEnergy, resolventPotential, norm_sub_sq_real, Pi.sub_apply]
     rw [real_inner_comm x' (J s x')]
     ring
   · ext v
     simp [InnerProductSpace.toDual_apply_apply]
 
-/-- Parameter differentiation uses the same optimizer sandwich together with `resolvent_parameter_continuousAt`. -/
+/-- The parameter derivative is the energy gap at the resolvent. -/
 theorem hasDerivAt_interiorEnvelope (hUN : IsUN bounds E g)
     {s : ℝ} (hs : s ∈ envelopeDomain bounds) (x : H) :
     HasDerivAt (fun s₁ => M s₁ x) (E (J s x) - EStar) s := by
@@ -323,7 +329,11 @@ theorem hasDerivAt_interiorEnvelope (hUN : IsUN bounds E g)
     _ ≤ c * |s₁ - s| := by
       nlinarith [mul_le_mul_of_nonneg_left (le_of_lt hsmall) (abs_nonneg (s₁ - s))]
 
-/-- Interior version of Proposition 5, written as a pointwise lower bound. -/
+/-!
+## Proximal identities
+-/
+
+/-- The scaled energy gap bounds the proximal objective from below. -/
 theorem interiorEnvelope_proximal_lower (hUN : IsUN bounds E g)
     {s : ℝ} (hs : s ∈ envelopeDomain bounds)
     (x ξ : H) :
@@ -338,6 +348,46 @@ theorem interiorEnvelope_at_step (hUN : IsUN bounds E g)
   rw [hUN.resolvent_apply_step hs]
   simp only [sub_sub_cancel, norm_smul, Real.norm_eq_abs, mul_pow, sq_abs]
   ring
+
+/-- The proximal objective attains the scaled energy gap exactly at the gradient step. -/
+theorem interiorEnvelope_proximal_eq_iff (hUN : IsUN bounds E g)
+    {s : ℝ} (hs : s ∈ envelopeDomain bounds) (x ξ : H) :
+    M s ξ + (1 / 2 : ℝ) * ‖ξ - x‖ ^ 2 = s * (E x - EStar) ↔ ξ = x - s • g x := by
+  have hEq : M s ξ + (1 / 2 : ℝ) * ‖ξ - x‖ ^ 2 = s * (E x - EStar) ↔ x = J s ξ := by
+    rw [← hUN.envelopeObjective_eq_iff hs ξ x]
+    unfold envelopeObjective
+    rw [norm_sub_rev x ξ]
+    constructor <;> intro h <;> linarith
+  rw [hEq]
+  constructor
+  · intro h
+    rw [h]
+    exact (hUN.resolvent_equation hs ξ).symm
+  · rintro rfl
+    exact (hUN.resolvent_apply_step hs x).symm
+
+/-- The gradient step is the unique minimizer of the proximal objective. -/
+theorem interiorEnvelope_proximal_isMinOn_iff (hUN : IsUN bounds E g)
+    {s : ℝ} (hs : s ∈ envelopeDomain bounds) (x ξ : H) :
+    IsMinOn (fun u => M s u + (1 / 2 : ℝ) * ‖u - x‖ ^ 2) Set.univ ξ ↔ ξ = x - s • g x := by
+  have hAt := (hUN.interiorEnvelope_proximal_eq_iff hs x (x - s • g x)).mpr rfl
+  rw [isMinOn_univ_iff]
+  constructor
+  · intro h
+    apply (hUN.interiorEnvelope_proximal_eq_iff hs x ξ).mp
+    exact le_antisymm ((h (x - s • g x)).trans_eq hAt) (hUN.interiorEnvelope_proximal_lower hs x ξ)
+  · rintro rfl u
+    rw [hAt]
+    exact hUN.interiorEnvelope_proximal_lower hs x u
+
+/-- The minimum proximal value recovers the scaled energy gap. -/
+theorem interiorEnvelope_proximal_iInf (hUN : IsUN bounds E g)
+    {s : ℝ} (hs : s ∈ envelopeDomain bounds) (x : H) :
+    (⨅ ξ : H, M s ξ + (1 / 2 : ℝ) * ‖ξ - x‖ ^ 2) = s * (E x - EStar) := by
+  apply IsLeast.csInf_eq
+  refine ⟨⟨x - s • g x, (hUN.interiorEnvelope_proximal_eq_iff hs x (x - s • g x)).mpr rfl⟩, ?_⟩
+  rintro _ ⟨ξ, rfl⟩
+  exact hUN.interiorEnvelope_proximal_lower hs x ξ
 
 end IsUN
 

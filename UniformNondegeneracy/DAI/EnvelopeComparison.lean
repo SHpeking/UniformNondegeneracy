@@ -9,11 +9,9 @@ public import UniformNondegeneracy.DAI.Weights
 open scoped RealInnerProductSpace
 
 /-!
-# Envelope comparison specialized to DAI parameters
+# Envelope comparison at DAI scales
 
-Strict scales keep the auxiliary centered-envelope parameter inside its domain. The resulting independent-anchor comparison is a property of UN energies; it does not refer to an algorithm or a trajectory. `DAI.FromUN` subsequently extends the finite DAI inequality to boundary scales.
-
-Reference: arXiv:2610.06115v1, Lemma 8.
+A weighted sum of envelope values at positive and negative parameters, together with quadratic terms, bounds the inner product of two anchors centered at the stationary point. This comparison yields the descent–ascent inequality.
 -/
 
 noncomputable section
@@ -25,7 +23,6 @@ variable {bounds : CurvatureBounds} {E : H → ℝ} {g : H → H}
 
 local notation "M" => interiorEnvelope E g
 
-/-- The auxiliary parameter in Lemma 8 is interior for strict original scales. -/
 theorem DAI.StrictAdmissible.centered_envelope_parameter_mem {Λ : Scales}
     (hStrict : StrictAdmissible bounds Λ) :
     -1 / Λ.radius ∈ envelopeDomain hStrict.toAdmissible.centeredBounds := by
@@ -186,9 +183,7 @@ private theorem envelope_pair_equality (hUN : IsUN bounds E g) {Λ : Scales}
   change ⟪x₁ - xStar, x₂ - xStar⟫ ≤ _
   linarith only [hmul, hnegative]
 
-/-- Strict-scale version of Lemma 8. This is the independent-anchor comparison that `DAI.FromUN` applies to the relative energy `bregman E g · x`.
-
-`x₁` is the positive-envelope anchor and `x₂` is the negative-envelope anchor. The proof reduces the weight product to equality using nonnegativity of both brackets, tests the positive envelope at a rescaled negative anchor, applies the closed-gap rescaled comparison to the centered energy, and completes the square. Strict scales ensure `q > 0` and keep every envelope finite. -/
+/-- The weighted envelope values and quadratic terms bound the inner product of their centered anchors. -/
 theorem envelope_pair_comparison_strict (hUN : IsUN bounds E g)
     {Λ : Scales} (hStrict : StrictAdmissible bounds Λ)
     (ρ : Weights)

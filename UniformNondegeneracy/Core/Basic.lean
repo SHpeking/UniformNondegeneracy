@@ -8,17 +8,13 @@ open scoped RealInnerProductSpace
 
 /-!
 # Secant definition of uniform nondegeneracy
-
-`IsUN bounds E g` contains exactly the gradient identity and the two global secant inequalities. In particular, surjectivity and a stationary point are conclusions in `Geometry`, not fields of this predicate.
 -/
 
 namespace UN
 
 variable {H : Type*} [NormedAddCommGroup H] [InnerProductSpace ℝ H] [CompleteSpace H]
 
-/-- Uniform nondegeneracy, expressed entirely in first-order terms.
-
-`E : H → ℝ` is the energy and `g : H → H` is its specified gradient. Positive/negative refer to the two curvature bands, not to a splitting of the Hilbert space. -/
+/-- Uniform nondegeneracy of `E` with gradient `g`, given by the inner and outer secant inequalities. -/
 structure IsUN (bounds : CurvatureBounds) (E : H → ℝ) (g : H → H) : Prop where
   has_gradient : ∀ x, HasGradientAt E (g x) x
 

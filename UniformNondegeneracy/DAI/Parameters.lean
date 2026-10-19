@@ -6,8 +6,6 @@ public import Mathlib
 
 /-!
 # Descent–ascent scales and weights
-
-Primitive scale and weight data, independent of UN curvature bounds. Admissibility and compatible weight families are developed in separate modules.
 -/
 
 namespace UN.DAI
@@ -21,7 +19,7 @@ structure Scales where
   plus_pos : 0 < plus
   minus_pos : 0 < minus
 
-/-- Nonnegative DAI coefficients. Zero coefficients are intentionally permitted. -/
+/-- Nonnegative DAI weights. -/
 structure Weights where
   plus : ℝ
   minus : ℝ
@@ -30,6 +28,8 @@ structure Weights where
   minus_nonneg : 0 ≤ minus
 
 namespace Scales
+
+def unit : Scales := ⟨1, 1, zero_lt_one, zero_lt_one⟩
 
 def tauPlus (Λ : Scales) : ℝ := 1 / Λ.plus
 
@@ -74,6 +74,38 @@ theorem radius_sq_sub_center_sq (Λ : Scales) :
     (Λ.inflate ε hε).center = Λ.center := by simp [center]
 
 end Scales
+
+namespace Weights
+
+/-- Equal nonnegative weights. -/
+def symmetric (r : ℝ) (hr : 0 ≤ r) : Weights := ⟨r, r, hr, hr⟩
+
+/-- Balance equates the two weight-to-scale ratios. -/
+def Balanced (ρ : Weights) (Λ : Scales) : Prop :=
+  ρ.plus * Λ.minus = ρ.minus * Λ.plus
+
+theorem balanced_iff_ratio (ρ : Weights) (Λ : Scales) :
+    ρ.Balanced Λ ↔ ρ.plus / Λ.plus = ρ.minus / Λ.minus := by
+  exact (div_eq_div_iff Λ.plus_pos.ne' Λ.minus_pos.ne').symm
+
+end Weights
+
+/-- Balanced weights with common cross product `a`: `ρ₊ Λ₋ = ρ₋ Λ₊ = a`. -/
+def balancedWeights (Λ : Scales) (a : ℝ) (ha : 0 ≤ a) : Weights where
+  plus := a / Λ.minus
+  minus := a / Λ.plus
+  plus_nonneg := div_nonneg ha Λ.minus_pos.le
+  minus_nonneg := div_nonneg ha Λ.plus_pos.le
+
+theorem balancedWeights_balanced (Λ : Scales) (a : ℝ) (ha : 0 ≤ a) :
+    (balancedWeights Λ a ha).Balanced Λ := by
+  dsimp [Weights.Balanced, balancedWeights]
+  field_simp [Λ.plus_pos.ne', Λ.minus_pos.ne']
+
+theorem balancedWeights_product (Λ : Scales) (a : ℝ) (ha : 0 ≤ a) :
+    (balancedWeights Λ a ha).plus * (balancedWeights Λ a ha).minus * (Λ.plus * Λ.minus) = a ^ 2 := by
+  dsimp [balancedWeights]
+  field_simp [Λ.plus_pos.ne', Λ.minus_pos.ne']
 
 end
 end UN.DAI

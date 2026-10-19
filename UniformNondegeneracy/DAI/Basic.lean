@@ -8,7 +8,7 @@ public import UniformNondegeneracy.DAI.Steps
 open scoped RealInnerProductSpace
 
 /-!
-# Descent–ascent differences and the algebraic DAI interface
+# Descent–ascent inequalities
 -/
 
 noncomputable section
@@ -31,7 +31,7 @@ def phiMinus (E : H → ℝ) (g : H → H) (Λ : Scales) (x₁ x₂ : H) : ℝ :
 
 end DAI
 
-/-- DAI means descent–ascent inequality. The gradients of Φ are written as differences of explicit update maps, so this predicate is purely algebraic. In `∀ x y z`, `y` is the descent anchor and `z` is the ascent anchor. -/
+/-- The descent–ascent inequality with base point `x`, descent anchor `y`, and ascent anchor `z`. -/
 def HasDAI (E : H → ℝ) (g : H → H) (Λ : Scales) (ρ : Weights) : Prop :=
   ∀ x y z,
     ⟪descentStep g Λ x - descentStep g Λ y, ascentStep g Λ x - ascentStep g Λ z⟫ ≤
@@ -89,6 +89,33 @@ theorem phiMinus_three_point (E : H → ℝ) (g : H → H) (Λ : Scales)
 
 end DAI
 
+namespace HasDAI
+
+variable {E : H → ℝ} {g : H → H} {Λ : Scales} {ρ : Weights}
+
+/-- Positive DAI weights imply both quadratic Bregman bounds by setting one anchor equal to the base point. -/
+theorem hasBregmanBounds (hDAI : HasDAI E g Λ ρ) (hPlus : 0 < ρ.plus) (hMinus : 0 < ρ.minus) :
+    HasBregmanBounds E g Λ.plus Λ.minus := by
+  constructor
+  · intro x₁ x₂
+    have hPhi : 0 ≤ phiMinus E g Λ x₁ x₂ :=
+      nonneg_of_mul_nonneg_right (by simpa [phiPlus] using hDAI x₁ x₁ x₂) hMinus
+    have h := mul_le_mul_of_nonneg_left hPhi Λ.minus_pos.le
+    have hScale : Λ.minus * Λ.tauMinus = 1 := by dsimp [Scales.tauMinus]; field_simp [Λ.minus_pos.ne']
+    dsimp [phiMinus] at h
+    rw [mul_add, ← mul_assoc, hScale, one_mul] at h
+    linarith
+  · intro x₁ x₂
+    have hPhi : 0 ≤ phiPlus E g Λ x₁ x₂ :=
+      nonneg_of_mul_nonneg_right (by simpa [phiMinus] using hDAI x₁ x₂ x₁) hPlus
+    have h := mul_le_mul_of_nonneg_left hPhi Λ.plus_pos.le
+    have hScale : Λ.plus * Λ.tauPlus = 1 := by dsimp [Scales.tauPlus]; field_simp [Λ.plus_pos.ne']
+    dsimp [phiPlus] at h
+    rw [mul_sub, ← mul_assoc, hScale, one_mul] at h
+    linarith
+
+end HasDAI
+
 namespace HasBregmanBounds
 
 variable {E : H → ℝ} {g : H → H} {Λ : Scales}
@@ -111,7 +138,7 @@ theorem phiMinus_nonneg (hBounds : HasBregmanBounds E g Λ.plus Λ.minus) (x₁ 
   unfold phiMinus
   linarith
 
-/-- Trial-point estimate; its proof uses only the global Bregman bounds. -/
+/-- Differences of descent images are controlled by `phiPlus`. -/
 theorem descentStep_norm_sq_le (hBounds : HasBregmanBounds E g Λ.plus Λ.minus) (x₁ x₂ : H) :
     ‖descentStep g Λ x₁ - descentStep g Λ x₂‖ ^ 2 ≤ 2 * (1 + Λ.minus / Λ.plus) * phiPlus E g Λ x₁ x₂ := by
   apply norm_sq_le_of_nonneg_quadratic (fun ξ => phiPlus E g Λ ξ x₂) x₁

@@ -6,7 +6,7 @@ public import UniformNondegeneracy.DAI.FromUN
 @[expose] public section
 
 /-!
-# Bridge from UN geometry to the algebraic ADA certificate
+# Lyapunov bounds from UN
 -/
 
 noncomputable section
@@ -18,7 +18,7 @@ open DAI
 variable {H : Type*} [NormedAddCommGroup H] [InnerProductSpace ℝ H] [CompleteSpace H]
 variable {bounds : CurvatureBounds} {E : H → ℝ} {g : H → H} {Λ : Scales}
 
-/-- Use effective UN bounds for signed PL, original outer bounds for Bregman control, and the canonical-weight DAI theorem. -/
+/-- UN supplies the Bregman, signed PL, and DAI bounds for the corrected energy. -/
 theorem lyapunovInputs_of_isUN (hUN : IsUN bounds E g)
     (hAdmissible : Admissible bounds Λ) :
     LyapunovInputs bounds E g Λ hAdmissible (stationaryValue E g) := by
@@ -32,7 +32,7 @@ theorem lyapunovInputs_of_isUN (hUN : IsUN bounds E g)
   · intro x
     exact ((hUN.effectiveBounds hAdmissible).signedPL x).2
 
-/-- Public bridge, independent of the choice of first phase of the full run. The order restriction belongs only to this canonical-cycle analysis. -/
+/-- Lyapunov bounds for descent–ascent cycles under UN. -/
 theorem hasLyapunovBounds_of_isUN (hUN : IsUN bounds E g)
     (hAdmissible : Admissible bounds Λ)
     (hOrder : Λ.tauMinus ≤ Λ.tauPlus) (x₀ : H) :

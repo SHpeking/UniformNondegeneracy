@@ -5,20 +5,19 @@ public import Mathlib
 @[expose] public section
 
 /-!
-# Signed gradient maps
+# Signed gradient steps
 
-Generic explicit maps, independent of UN, DAI scales, and trajectories. Positive `τ` means descent; negative `τ` means ascent.
+Positive `τ` means descent; negative `τ` means ascent.
 -/
 
 noncomputable section
 namespace UN
 variable {H : Type*} [NormedAddCommGroup H] [InnerProductSpace ℝ H]
 
-/-- A signed gradient update.  Positive `τ` means descent. -/
 def gradientStep (g : H → H) (τ : ℝ) (x : H) : H :=
   x - τ • g x
 
-/-- A Lipschitz estimate used to control a possible initial smaller step. -/
+/-- A Lipschitz bound on `g` controls its norm after a signed gradient step. -/
 theorem norm_gradient_step_le {g : H → H} {L : NNReal}
     (hLip : LipschitzWith L g)
     (τ : ℝ) (x : H) :

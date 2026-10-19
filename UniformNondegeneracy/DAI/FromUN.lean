@@ -8,9 +8,9 @@ public import UniformNondegeneracy.DAI.EnvelopeComparison
 open scoped RealInnerProductSpace
 
 /-!
-# From UN to DAI, including boundary scales
+# Descent–ascent inequalities from UN
 
-The strict case is proved using centered envelopes. For general admissible scales, inflate both scales by the same positive amount, prove DAI there, and take the limit in the finite inequality for fixed points. This handles q = 0 without dividing by q or taking limits of entire ADA trajectories.
+UN energies satisfy DAI at admissible scales with compatible weights. The proof uses centered envelopes and continuity in the scales.
 -/
 
 open Filter
@@ -68,7 +68,7 @@ private theorem minus_envelope_at_step (hUN : IsUN bounds E g)
     real_inner_comm x₁ (g x₂), real_inner_comm x₁ (g x₁)]
   ring
 
-/-- Analytic core: strict outer scales place auxiliary envelopes in their domains. -/
+/-- DAI from the envelope comparison at strict admissible scales. -/
 theorem hasDAI_of_strict (hUN : IsUN bounds E g)
     (hStrict : StrictAdmissible bounds Λ) (ρ : Weights)
     (hWeights : CompatibleWeights bounds Λ ρ) :
@@ -88,7 +88,7 @@ theorem hasDAI_of_strict (hUN : IsUN bounds E g)
   rw [show z - (-τ₋) • (g z - g x) - x = -(x - (-τ₋) • g x - (z - (-τ₋) • g z)) by module]
   rw [inner_neg_neg]
 
-/-- Inflate the scales by `ε > 0` and add `sqrt (2 * Λ.radius * ε + ε ^ 2)` to the scaled weight numerators. This preserves compatibility and converges to the original weights, including when `q = 0` or a weight vanishes. The limit is taken only in the finite inequality for three fixed points. -/
+/-- Extend DAI from strict to admissible scales by simultaneous inflation of both scales. -/
 private theorem hasDAI_by_inflation (hUN : IsUN bounds E g)
     (hAdmissible : Admissible bounds Λ) (ρ : Weights)
     (hWeights : CompatibleWeights bounds Λ ρ) :
@@ -167,14 +167,13 @@ private theorem hasDAI_by_inflation (hUN : IsUN bounds E g)
     descentStep, ascentStep, gradientStep, phiPlus, phiMinus,
     Scales.tauPlus, Scales.tauMinus, Λ.plus_pos.ne', Λ.minus_pos.ne'] using hlim
 
-/-- Canonical-weight DAI, obtained by equal scale inflations and continuity; valid even when `q = 0`. -/
 theorem hasDAI_canonicalWeights (hUN : IsUN bounds E g)
     (hAdmissible : Admissible bounds Λ) :
     HasDAI E g Λ hAdmissible.canonicalWeights := by
   exact hUN.hasDAI_by_inflation hAdmissible hAdmissible.canonicalWeights
     hAdmissible.canonicalWeights_compatible
 
-/-- The full DAI weight family, including boundary scales and zero weights. -/
+/-- DAI at admissible scales with compatible weights. -/
 theorem hasDAI (hUN : IsUN bounds E g)
     (hAdmissible : Admissible bounds Λ) (ρ : Weights)
     (hWeights : CompatibleWeights bounds Λ ρ) :

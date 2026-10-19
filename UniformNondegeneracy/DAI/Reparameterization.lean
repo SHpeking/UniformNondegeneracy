@@ -6,7 +6,7 @@ public import UniformNondegeneracy.Geometry.Transforms
 @[expose] public section
 
 /-!
-# UN reparameterization at descent-ascent scales
+# UN reparameterization at descent–ascent scales
 -/
 
 noncomputable section
@@ -41,7 +41,7 @@ private theorem centered_upper (hUN : IsUN bounds E g) {Λ : Scales}
   rw [centeredOuterRadius_eq bounds Λ]
   nlinarith [hUN.outer_centered x₁ x₂]
 
-/-- Reparameterization at descent-ascent scales: take the largest inner interval centered at `Λ.center` contained in the original gap, and enlarge the outer bounds to the selected scales. -/
+/-- Reparameterization at descent–ascent scales: take the largest inner interval centered at `Λ.center` contained in the original gap, and enlarge the outer bounds to the selected scales. -/
 theorem effectiveBounds (hUN : IsUN bounds E g) {Λ : Scales}
     (hAdmissible : Admissible bounds Λ) :
     IsUN hAdmissible.effectiveBounds E g := by
@@ -65,7 +65,7 @@ theorem effectiveBounds (hUN : IsUN bounds E g) {Λ : Scales}
       (mul_le_mul_of_nonneg_right houter (norm_nonneg (x₁ - x₂)))
     nlinarith [norm_nonneg (g x₁ - g x₂ - Λ.center • (x₁ - x₂))]
 
-/-- The centered auxiliary energy has symmetric bounds even when the original energy and selected scales are fully asymmetric. -/
+/-- The centered energy has symmetric curvature bounds. -/
 theorem centered (hUN : IsUN bounds E g) {Λ : Scales}
     (hAdmissible : Admissible bounds Λ) :
     IsUN hAdmissible.centeredBounds (UN.quadraticShift E Λ.center xStar) (fun x₁ => g x₁ - Λ.center • (x₁ - xStar)) := by

@@ -2,17 +2,16 @@ module
 
 public import UniformNondegeneracy.Envelopes.Basic
 public import UniformNondegeneracy.Geometry.Transforms
+public import UniformNondegeneracy.Geometry.Duality
 
 @[expose] public section
 
 open scoped RealInnerProductSpace
 
 /-!
-# Intrinsic envelope comparisons
+# Envelope comparisons
 
-Weighted-quotient differentiation, the quadratic comparison, quadratic-shift covariance, and closed-gap rescaling are independent of algorithmic scales. The specialization to DAI parameters is in `DAI.EnvelopeComparison`.
-
-Reference: arXiv:2610.06115v1, Proposition 6 and Corollary 7.
+Quadratic comparison inequalities and covariance under quadratic shifts.
 -/
 
 noncomputable section
@@ -24,7 +23,7 @@ namespace UN
 
 variable {H : Type*} [NormedAddCommGroup H] [InnerProductSpace ℝ H] [CompleteSpace H]
 
-/-- The spatial rescaling in Corollary 7; the denominator is proved positive under the interior-parameter and closed-gap hypotheses below. -/
+/-- Rescaling about the stationary point by `(1 - s * c)⁻¹`. -/
 def rescaledEnvelopePoint (g : H → H) (s c : ℝ) (x : H) : H :=
   stationaryPoint g + (1 - s * c)⁻¹ • (x - stationaryPoint g)
 
@@ -82,7 +81,7 @@ end Envelopes
 
 namespace IsUN
 
-/-- Differentiation of `M s x / s` with respect to `s`, using the resolvent equation. -/
+/-- Parameter derivative of `M s x / s`. -/
 theorem hasDerivAt_envelope_quotient (hUN : IsUN bounds E g)
     {s : ℝ} (hs : s ∈ envelopeDomain bounds) (hs_ne : s ≠ 0)
     (x : H) :
@@ -132,7 +131,7 @@ private theorem inner_parameter_bounds {s : ℝ} (hs : s ∈ envelopeDomain boun
   · nlinarith [mul_lt_mul_of_pos_right h2 bounds.muPlus_pos]
   · nlinarith [mul_lt_mul_of_pos_right h1 bounds.muMinus_pos]
 
-/-- Equation (16): the refined inner secant bounds the derivative of the weighted envelope quotient from below. The zero parameter is treated by a limit. -/
+/-- The inner curvature bounds control the derivative of the weighted envelope quotient from below. -/
 theorem weighted_envelope_quotient_deriv_lower (hUN : IsUN bounds E g)
     {s : ℝ} (hs : s ∈ envelopeDomain bounds) (hs_ne : s ≠ 0)
     (x : H) :
@@ -174,7 +173,7 @@ theorem weighted_envelope_quotient_deriv_lower (hUN : IsUN bounds E g)
   dsimp [ξ] at href hab ⊢
   nlinarith only [href, hab]
 
-/-- Proposition 6. Integrate the preceding derivative inequality separately on the positive and negative parameter intervals and use the derivative at zero. -/
+/-- Quadratic comparison between the envelope and the energy gap. -/
 theorem envelope_comparison (hUN : IsUN bounds E g)
     {s : ℝ} (hs : s ∈ envelopeDomain bounds) (x : H) :
     s * (E x - EStar) + s ^ 2 * μ₊ * μ₋ / 2 * ‖x - xStar‖ ^ 2 ≤ (1 - s * μ₊) * (1 + s * μ₋) * M s x := by
@@ -252,7 +251,7 @@ theorem envelope_comparison (hUN : IsUN bounds E g)
     dsimp [ΔE, C, ω, Mx] at hmul ⊢
     nlinarith [hcancel]
 
-/-- Completing the square gives the envelope transformation used in Corollary 7. The shifted energy has the same stationary point and stationary value. -/
+/-- Envelope covariance under a quadratic shift about the stationary point. -/
 theorem interiorEnvelope_quadraticShift (hUN : IsUN bounds E g)
     {s c : ℝ} (hs : s ∈ envelopeDomain bounds)
     (hLower : -μ₋ < c) (hUpper : c < μ₊)
@@ -294,7 +293,7 @@ theorem interiorEnvelope_quadraticShift (hUN : IsUN bounds E g)
   field_simp
   ring
 
-/-- Corollary 7 for the entire closed inner gap. First prove the open-gap case with `quadraticShift` and Proposition 6, then use continuity in `c`. The endpoint limit concerns the coefficient, not an endpoint envelope. -/
+/-- Envelope comparison after rescaling about the stationary point. -/
 theorem envelope_rescaled_comparison (hUN : IsUN bounds E g)
     {s c : ℝ} (hs : s ∈ envelopeDomain bounds)
     (hc_mem : c ∈ Set.Icc (-μ₋) μ₊) (x : H) :

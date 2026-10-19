@@ -10,16 +10,14 @@ open scoped BigOperators
 /-!
 # Scalar residual decay from a Lyapunov certificate
 
-The comparison constant `C` is arbitrary. A positive integer window `W` satisfying `4 * (C - 1) ≤ W` gives a factor-two residual reduction. Applications choose their comparison constant and window; no UN parameters, algorithm, or condition-number normalization occur here.
-
-The residual need not decrease. The conclusion concerns its minimum through the observation horizon, including index zero.
+A Lyapunov decrease bound and comparison with squared residuals give exponential decay of the minimum residual.
 -/
 
 noncomputable section
 
 namespace UN
 
-/-- A normalized scalar decrease certificate with an arbitrary potential comparison constant. -/
+/-- A potential comparable to squared residuals, with decrease at least the current squared residual. -/
 structure HasLyapunovBounds (C : ℝ) (r P : ℕ → ℝ) : Prop where
   one_le_comparison : 1 ≤ C
   residual_nonneg : ∀ t, 0 ≤ r t
@@ -41,7 +39,6 @@ theorem potential_antitone (hLyapunov : HasLyapunovBounds C r P) :
   intro n
   linarith [hLyapunov.sufficient_decrease n, sq_nonneg (r n)]
 
-/-- The certificate remains valid after discarding a finite prefix. -/
 theorem tail (hLyapunov : HasLyapunovBounds C r P) (t₀ : ℕ) :
     HasLyapunovBounds C (fun t => r (t₀ + t)) (fun t => P (t₀ + t)) := by
   refine ⟨hLyapunov.one_le_comparison, ?_, ?_, ?_, ?_⟩
@@ -50,7 +47,7 @@ theorem tail (hLyapunov : HasLyapunovBounds C r P) (t₀ : ℕ) :
   · exact fun i => hLyapunov.potential_le_residual_sq (t₀ + i)
   · exact fun i => hLyapunov.sufficient_decrease (t₀ + i)
 
-/-- Telescope from the next index. The initial decrease improves the comparison coefficient from `C` to `C - 1`. -/
+/-- The initial decrease improves the telescoping bound from `C` to `C - 1`. -/
 theorem sum_residual_sq_le (hLyapunov : HasLyapunovBounds C r P) (t₀ T : ℕ) :
     (∑ j ∈ Finset.range T, (r (t₀ + j + 1)) ^ 2) ≤ (C - 1) * (r t₀) ^ 2 := by
   have htelescope : ∀ n : ℕ,
@@ -70,7 +67,6 @@ theorem sum_residual_sq_le (hLyapunov : HasLyapunovBounds C r P) (t₀ T : ℕ) 
   have hu := hLyapunov.potential_le_residual_sq t₀
   nlinarith
 
-/-- A short interval contains a residual controlled by its starting residual. The witnessing index is strictly after `t₀`, and at most `T` later. -/
 theorem exists_residual_sq_le (hLyapunov : HasLyapunovBounds C r P)
     (t₀ T : ℕ) (hT_pos : 0 < T) :
     ∃ t,
@@ -103,7 +99,7 @@ theorem exists_residual_le_half (hLyapunov : HasLyapunovBounds C r P)
   have hsq := hr.trans (mul_le_mul_of_nonneg_right hratio (sq_nonneg (r t₀)))
   nlinarith [hLyapunov.residual_nonneg t₀, hLyapunov.residual_nonneg t]
 
-/-- Repeated reductions along the same sequence; no algorithmic restart is involved. -/
+/-- Successive windows yield geometric residual reduction. -/
 theorem exists_residual_le_geometric (hLyapunov : HasLyapunovBounds C r P)
     (W : ℕ) (hW_pos : 0 < W) (hWindow : 4 * (C - 1) ≤ (W : ℝ)) (B : ℕ) :
     ∃ t ≤ B * W, r t ≤ (1 / 2 : ℝ) ^ B * r 0 := by

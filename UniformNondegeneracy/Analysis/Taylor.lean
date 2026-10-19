@@ -8,8 +8,6 @@ open scoped RealInnerProductSpace
 
 /-!
 # Quadratic differentiation and Taylor estimates
-
-These estimates require neither uniform nondegeneracy nor gradient invertibility. They provide general analytic input to the structural geometry.
 -/
 
 namespace UN
@@ -97,7 +95,7 @@ theorem taylor_lower_bound_of_inner
   simp only [inner_neg_left] at this
   linarith
 
-/-- The quadratic remainder estimate for an energy with a Lipschitz gradient. Restrict the energy to a line segment and compare its derivative with a quadratic polynomial. This also supplies the lower Taylor bound used by normalized ascent. -/
+/-- Quadratic Taylor remainder bound for an energy with a Lipschitz gradient. -/
 theorem abs_taylor_remainder_le
     (E : H → ℝ) (g : H → H) (L : ℝ)
     (hGrad : ∀ x, HasGradientAt E (g x) x)

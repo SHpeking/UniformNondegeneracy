@@ -5,19 +5,50 @@ public import UniformNondegeneracy.DAI.Admissibility
 @[expose] public section
 
 /-!
-# Compatible DAI weights
+# DAI weight families
 
-The compatible family and its canonical asymmetric pair are shared DAI results. Their definitions do not involve an algorithm.
+Balanced weights for the secant bounds and compatible weights for the UN-to-DAI theorem.
 -/
 
 namespace UN.DAI
 noncomputable section
 
+/-- Balanced weights at the outer scales, with common numerator equal to the outer radius. -/
+def outerSecantWeights (bounds : CurvatureBounds) : Weights :=
+  balancedWeights (outerScales bounds) (outerScales bounds).radius (outerScales bounds).radius_pos.le
+
+/-- Balanced weights recovering the inner secant at the balanced scales. -/
+def innerSecantWeights (bounds : CurvatureBounds) : Weights :=
+  balancedWeights (balancedScales bounds)
+    (Real.sqrt (bounds.maxBandWidth * (bounds.maxBandWidth + bounds.muPlus + bounds.muMinus))) (Real.sqrt_nonneg _)
+
+theorem outerSecantWeights_balanced (bounds : CurvatureBounds) :
+    (outerSecantWeights bounds).Balanced (outerScales bounds) :=
+  balancedWeights_balanced _ _ _
+
+theorem outerSecantWeights_pos (bounds : CurvatureBounds) :
+    0 < (outerSecantWeights bounds).plus ∧ 0 < (outerSecantWeights bounds).minus :=
+  ⟨div_pos (outerScales bounds).radius_pos (outerScales bounds).minus_pos,
+    div_pos (outerScales bounds).radius_pos (outerScales bounds).plus_pos⟩
+
+theorem innerSecantWeights_balanced (bounds : CurvatureBounds) :
+    (innerSecantWeights bounds).Balanced (balancedScales bounds) :=
+  balancedWeights_balanced _ _ _
+
+theorem innerSecantWeights_product (bounds : CurvatureBounds) :
+    (innerSecantWeights bounds).plus * (innerSecantWeights bounds).minus *
+      ((balancedScales bounds).plus * (balancedScales bounds).minus) =
+      bounds.maxBandWidth * (bounds.maxBandWidth + bounds.muPlus + bounds.muMinus) := by
+  unfold innerSecantWeights
+  rw [balancedWeights_product, Real.sq_sqrt]
+  exact mul_nonneg bounds.maxBandWidth_nonneg
+    (by linarith [bounds.maxBandWidth_nonneg, bounds.muPlus_pos, bounds.muMinus_pos])
+
 namespace Admissible
 
 variable {bounds : CurvatureBounds} {Λ : Scales}
 
-/-- Canonical asymmetric DAI weights; any application may use this pair. -/
+/-- Weights with product `q bounds Λ`, used in the ADA Lyapunov estimate. -/
 def canonicalWeights (hAdmissible : Admissible bounds Λ) : Weights where
   plus := q bounds Λ * Λ.tauMinus / Λ.tauPlus
   minus := Λ.tauPlus / Λ.tauMinus

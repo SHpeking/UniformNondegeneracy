@@ -5,9 +5,7 @@ public import Mathlib
 @[expose] public section
 
 /-!
-# Curvature parameters of the UN class
-
-Only intrinsic curvature magnitudes and their transformations belong here. Descent-ascent scales, weights, and the associated condition number are defined separately in `DAI.Parameters`. The core theory has no algorithm dependency.
+# Curvature bounds and their transformations
 -/
 
 namespace UN
@@ -32,6 +30,10 @@ def muMin (bounds : CurvatureBounds) : ℝ := min bounds.muPlus bounds.muMinus
 
 def lMax (bounds : CurvatureBounds) : ℝ := max bounds.lPlus bounds.lMinus
 
+/-- Maximum width of the two curvature bands. -/
+def maxBandWidth (bounds : CurvatureBounds) : ℝ :=
+  max (bounds.lPlus - bounds.muPlus) (bounds.lMinus - bounds.muMinus)
+
 def innerCenter (bounds : CurvatureBounds) : ℝ := (bounds.muPlus - bounds.muMinus) / 2
 
 def innerRadius (bounds : CurvatureBounds) : ℝ := (bounds.muPlus + bounds.muMinus) / 2
@@ -55,7 +57,7 @@ def swap (bounds : CurvatureBounds) : CurvatureBounds where
   muPlus_le_lPlus := bounds.muMinus_le_lMinus
   muMinus_le_lMinus := bounds.muPlus_le_lPlus
 
-/-- Reciprocal curvature bounds of the inverse-gradient energy. -/
+/-- Reciprocal curvature bounds for the Legendre transform. -/
 def dual (bounds : CurvatureBounds) : CurvatureBounds where
   muPlus := 1 / bounds.lPlus
   muMinus := 1 / bounds.lMinus
@@ -71,7 +73,7 @@ def dual (bounds : CurvatureBounds) : CurvatureBounds where
   muMinus_le_lMinus := by
     exact one_div_le_one_div_of_le bounds.muMinus_pos bounds.muMinus_le_lMinus
 
-/-- Bounds after subtracting `c / 2 * ‖x₁ - x₂‖²` from the energy. -/
+/-- Bounds after subtracting a scalar quadratic of curvature `c`. -/
 def shift (bounds : CurvatureBounds) (c : ℝ)
     (hLower : -bounds.muMinus < c) (hUpper : c < bounds.muPlus) :
     CurvatureBounds where
@@ -92,6 +94,9 @@ theorem lMinus_pos (bounds : CurvatureBounds) : 0 < bounds.lMinus := lt_of_lt_of
 theorem muMin_pos (bounds : CurvatureBounds) : 0 < bounds.muMin := lt_min bounds.muPlus_pos bounds.muMinus_pos
 
 theorem lMax_pos (bounds : CurvatureBounds) : 0 < bounds.lMax := lt_of_lt_of_le bounds.lPlus_pos (le_max_left _ _)
+
+theorem maxBandWidth_nonneg (bounds : CurvatureBounds) : 0 ≤ bounds.maxBandWidth :=
+  (sub_nonneg.mpr bounds.muPlus_le_lPlus).trans (le_max_left _ _)
 
 theorem muMin_le_lMax (bounds : CurvatureBounds) : bounds.muMin ≤ bounds.lMax :=
   (min_le_left _ _).trans (bounds.muPlus_le_lPlus.trans (le_max_left _ _))

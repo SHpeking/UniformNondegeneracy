@@ -2,21 +2,14 @@ module
 
 public import UniformNondegeneracy.Algorithms.ADA.Certificate
 public import UniformNondegeneracy.Analysis.ResidualDecay
+public import UniformNondegeneracy.DAI.ConditionNumber
 
 @[expose] public section
 
 /-!
-# The final ADA complexity theorem
+# ADA complexity bounds
 
-The main theorems quantify over every admissible asymmetric scale pair and either initial phase.  Horizons count individual gradient updates.
-
-Proof route:
-1. Apply the scalar residual theorem to the canonical Lyapunov certificate.
-2. Convert canonical cycle indices to even indices of the full trajectory.
-3. Use sign reversal and scale exchange when ascent is the larger step.
-4. If the first step is the smaller step, discard it and bound its residual by twice the initial residual using gradient Lipschitz continuity.
-
-Boundary scales and `q = 0` are already handled by the UN-to-DAI interface. There is no perturbation or limiting argument for trajectories in this file.
+Exponential bounds for the best gradient residual over individual updates, for admissible scales and either initial phase. Balanced scales minimize the condition number in the rate.
 -/
 
 noncomputable section
@@ -29,9 +22,7 @@ namespace ADA
 variable {H : Type*} [NormedAddCommGroup H] [InnerProductSpace ℝ H] [CompleteSpace H]
 variable {bounds : CurvatureBounds} {E : H → ℝ} {g : H → H} {Λ : Scales}
 
-/-- Canonical cycle estimate when descent is the larger step.
-
-Apply `hasLyapunovBounds_of_isUN`, then `HasLyapunovBounds.prefixMin_le_exp`.  No independent convergence proof belongs here. -/
+/-- Exponential residual bound over cycles when the descent step is at least as large as the ascent step. -/
 theorem canonical_cycle_prefixMin_le_exp
     (hUN : IsUN bounds E g) (hAdmissible : Admissible bounds Λ)
     (hOrder : Λ.tauMinus ≤ Λ.tauPlus)
@@ -51,10 +42,10 @@ theorem canonical_cycle_prefixMin_le_exp
     (hasLyapunovBounds_of_isUN hUN hAdmissible hOrder x₀).prefixMin_le_exp
       W hW_pos hWindow (17 * κ) hWindowUpper T
 
-/-- Universal multiplicative constant in the individual-update estimate. -/
+/-- Prefactor in the residual bound. -/
 def ratePrefactor : ℝ := 8
 
-/-- Universal exponential-rate constant in the individual-update estimate. -/
+/-- Exponential rate constant in the residual bound. -/
 def rateConstant : ℝ := Real.log 2 / 34
 
 theorem ratePrefactor_pos : 0 < ratePrefactor := by
@@ -79,7 +70,7 @@ private theorem cycle_exponential_le_update_exponential {κ : ℝ} (hk : 1 ≤ �
   rw [Real.exp_add, Real.exp_log (by norm_num)] at he
   linarith
 
-/-- The smaller initial ascent step increases the gradient norm by at most two. -/
+/-- The smaller initial ascent step increases the gradient norm by at most a factor of two. -/
 private theorem norm_gradient_ascent_le_two
     (hUN : IsUN bounds E g) (hAdmissible : Admissible bounds Λ)
     (hOrder : Λ.tauMinus ≤ Λ.tauPlus) (x : H) :
@@ -153,9 +144,7 @@ private theorem bestResidual_le_exp_of_order
       mul_le_mul hexp hres (norm_nonneg _) (by positivity)
     _ = _ := by unfold ratePrefactor; ring
 
-/-- Best-iterate complexity for every admissible asymmetric scale pair, every initial point, and either initial phase.
-
-The constants are fixed numerical definitions, independent of the Hilbert space, all curvature parameters, the energy, the initial point, and the horizon. The result includes stationary initial points and horizon zero. -/
+/-- Exponential decay of the best gradient residual over `N` updates. -/
 theorem bestResidual_le_exp
     (hUN : IsUN bounds E g) (hAdmissible : Admissible bounds Λ)
     (firstPhase : Phase) (x₀ : H) (N : ℕ) :
@@ -166,7 +155,7 @@ theorem bestResidual_le_exp
     have h := bestResidual_le_exp_of_order hUN.neg hAdmissible.swap hs firstPhase.flip x₀ N
     simpa only [bestResidual_neg_swap, hAdmissible.kappa_swap, norm_neg] using h
 
-/-- An iterate attaining the claimed residual accuracy exists by the given horizon.  This is the main theorem without a minimum or a division by the initial residual. -/
+/-- An iterate with the residual bound occurs by update `N`. -/
 theorem exists_residual_le_exp
     (hUN : IsUN bounds E g) (hAdmissible : Admissible bounds Λ)
     (firstPhase : Phase) (x₀ : H) (N : ℕ) :
@@ -174,7 +163,7 @@ theorem exists_residual_le_exp
   obtain ⟨k, hi, he⟩ := bestResidual_attained g Λ firstPhase x₀ N
   exact ⟨k, hi, he ▸ bestResidual_le_exp hUN hAdmissible firstPhase x₀ N⟩
 
-/-- Normalized best-iterate complexity for a nonzero initial gradient.  Positivity makes division by the initial residual legitimate. -/
+/-- Relative residual bound for a nonstationary initial point. -/
 theorem bestResidual_div_le_exp
     (hUN : IsUN bounds E g) (hAdmissible : Admissible bounds Λ)
     (firstPhase : Phase) (x₀ : H) (N : ℕ)
@@ -182,6 +171,22 @@ theorem bestResidual_div_le_exp
     bestResidual g Λ firstPhase x₀ N / ‖g x₀‖ ≤ ratePrefactor * Real.exp (-rateConstant * (N : ℝ) / kappa bounds Λ) := by
   exact (div_le_iff₀ hInitial).mpr
     (bestResidual_le_exp hUN hAdmissible firstPhase x₀ N)
+
+/-- Best-iterate complexity at the scales minimizing the DAI condition number. -/
+theorem bestResidual_balancedScales_le_exp
+    (hUN : IsUN bounds E g) (firstPhase : Phase) (x₀ : H) (N : ℕ) :
+    bestResidual g (balancedScales bounds) firstPhase x₀ N ≤
+      ratePrefactor * Real.exp (-rateConstant * (N : ℝ) / ((1 + bounds.maxBandWidth / bounds.muPlus) * (1 + bounds.maxBandWidth / bounds.muMinus))) * ‖g x₀‖ := by
+  simpa only [kappa_balancedScales] using
+    bestResidual_le_exp hUN (balancedScales_admissible bounds) firstPhase x₀ N
+
+/-- An iterate attains the balanced-scale residual bound by the given update horizon. -/
+theorem exists_residual_balancedScales_le_exp
+    (hUN : IsUN bounds E g) (firstPhase : Phase) (x₀ : H) (N : ℕ) :
+    ∃ k ≤ N, ‖g (trajectory g (balancedScales bounds) firstPhase x₀ k)‖ ≤
+      ratePrefactor * Real.exp (-rateConstant * (N : ℝ) / ((1 + bounds.maxBandWidth / bounds.muPlus) * (1 + bounds.maxBandWidth / bounds.muMinus))) * ‖g x₀‖ := by
+  simpa only [kappa_balancedScales] using
+    exists_residual_le_exp hUN (balancedScales_admissible bounds) firstPhase x₀ N
 
 end ADA
 end UN

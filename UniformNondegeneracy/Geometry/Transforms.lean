@@ -7,7 +7,7 @@ public import UniformNondegeneracy.Geometry.Basic
 open scoped RealInnerProductSpace
 
 /-!
-# Operations preserving UN, with explicit transformed gradients
+# Transformations preserving UN
 -/
 
 noncomputable section
@@ -90,7 +90,7 @@ theorem stationaryValue_relativeEnergy (hUN : IsUN bounds E g) (x₂ : H) :
     stationaryValue (UN.relativeEnergy E g x₂) (fun x₁ => g x₁ - g x₂) = 0 := by
   simp [stationaryValue, hUN.stationaryPoint_relativeEnergy, UN.relativeEnergy, bregman_self]
 
-/-- Open-gap shift. Endpoints require a limit argument, not this theorem. -/
+/-- Subtracting a quadratic with curvature in the inner gap preserves UN. -/
 theorem quadraticShift (hUN : IsUN bounds E g) (c : ℝ)
     (hLower : -μ₋ < c) (hUpper : c < μ₊)
     (x₂ : H) :

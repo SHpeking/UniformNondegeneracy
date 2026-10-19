@@ -8,15 +8,13 @@ open scoped RealInnerProductSpace
 
 /-!
 # Bregman differences and quadratic bounds
-
-These constructions and estimates are independent of uniform nondegeneracy and of descent–ascent scales. The second argument of `bregman E g x₁ x₂` is the expansion point. No gradient identity is needed for the algebraic identities or the estimates from global quadratic bounds.
 -/
 
 namespace UN
 
 variable {H : Type*} [NormedAddCommGroup H] [InnerProductSpace ℝ H]
 
-/-- The first-order remainder with expansion point `x₂`. It need not be nonnegative. -/
+/-- The first-order remainder of `E` relative to `g`, with expansion point `x₂`. -/
 def bregman (E : H → ℝ) (g : H → H) (x₁ x₂ : H) : ℝ :=
   E x₁ - E x₂ - ⟪g x₂, x₁ - x₂⟫
 
@@ -34,7 +32,7 @@ theorem bregman_three_point (E : H → ℝ) (g : H → H) (x₃ x₁ x₂ : H) :
   simp only [bregman, inner_sub_left, inner_sub_right]
   ring
 
-/-- Global lower and upper quadratic bounds. The constants are independent of any curvature certificate or selected step sizes. -/
+/-- Global lower and upper quadratic bounds on `bregman E g`. -/
 structure HasBregmanBounds (E : H → ℝ) (g : H → H) (LPlus LMinus : ℝ) : Prop where
   lower : ∀ x₁ x₂, -(LMinus / 2) * ‖x₁ - x₂‖ ^ 2 ≤ bregman E g x₁ x₂
   upper : ∀ x₁ x₂, bregman E g x₁ x₂ ≤ LPlus / 2 * ‖x₁ - x₂‖ ^ 2
@@ -42,6 +40,24 @@ structure HasBregmanBounds (E : H → ℝ) (g : H → H) (LPlus LMinus : ℝ) : 
 namespace HasBregmanBounds
 
 variable {E : H → ℝ} {g : H → H} {LPlus LMinus : ℝ}
+
+/-- Quadratic Bregman bounds imply that `g` is the gradient of `E`. -/
+theorem hasGradientAt [CompleteSpace H] (hBounds : HasBregmanBounds E g LPlus LMinus) (x : H) :
+    HasGradientAt E (g x) x := by
+  apply hasGradientAt_iff_isLittleO.mpr
+  have hO : (fun x₁ => bregman E g x₁ x) =O[nhds x] (fun x₁ => ‖x₁ - x‖ ^ 2) := by
+    apply Asymptotics.isBigO_of_le' (c := max |LPlus| |LMinus| / 2) (nhds x)
+    intro x₁
+    simp only [Real.norm_eq_abs, abs_of_nonneg (sq_nonneg ‖x₁ - x‖)]
+    apply abs_le.mpr
+    constructor
+    · have h := hBounds.lower x₁ x
+      have hm : LMinus ≤ max |LPlus| |LMinus| := (le_abs_self _).trans (le_max_right _ _)
+      nlinarith [mul_nonneg (sub_nonneg.mpr hm) (sq_nonneg ‖x₁ - x‖)]
+    · have h := hBounds.upper x₁ x
+      have hm : LPlus ≤ max |LPlus| |LMinus| := (le_abs_self _).trans (le_max_left _ _)
+      nlinarith [mul_nonneg (sub_nonneg.mpr hm) (sq_nonneg ‖x₁ - x‖)]
+  exact hO.trans_isLittleO (Asymptotics.isLittleO_pow_sub_sub x (by norm_num : 1 < 2))
 
 /-- Enlarging either outer bound preserves the quadratic estimates. -/
 theorem mono (hBounds : HasBregmanBounds E g LPlus LMinus)
@@ -66,7 +82,7 @@ private lemma interpolation_cost (u v : H) (a b : ℝ) (hab : a + b ≠ 0) :
   field_simp
   ring
 
-/-- Interpolate the two global quadratic models at their optimal common trial point. Only the sum of the two constants needs to be positive. -/
+/-- Interpolate the two quadratic models at their optimal common trial point. -/
 theorem interpolation_upper (hBounds : HasBregmanBounds E g LPlus LMinus)
     (hSum : 0 < LPlus + LMinus) (x₁ x₂ : H) :
     bregman E g x₁ x₂ ≤

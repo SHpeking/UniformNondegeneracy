@@ -7,20 +7,9 @@ public import UniformNondegeneracy.Analysis.Taylor
 open scoped RealInnerProductSpace
 
 /-!
-# Global inversion for a gradient with two-sided Lipschitz bounds
+# Global inversion of gradient maps
 
-This module is independent of UN curvature bounds. It proves global surjectivity of a bi-Lipschitz gradient on a real Hilbert space using finite directional improvement and closedness of the gradient range.
-
-The only differential hypothesis is `HasGradientAt E (g x) x`. Continuity of the gradient is supplied by its upper Lipschitz bound. Neither finite dimensionality, differentiability of `g`, nor surjectivity is assumed.
-
-The proof uses finite normalized ascent to obtain directional improvement, then geometric residual decay. The lower Lipschitz bound and completeness make the gradient range closed, so the improving residuals establish surjectivity.
-
-Proof order:
-1. Quadratic Taylor estimates imported from `Analysis.Taylor`.
-2. The gradient and estimates for a directional finite difference.
-3. Finite normalized ascent and directional improvement.
-4. Residual contraction and a geometrically improving sequence.
-5. Completeness, surjectivity, and inverse estimates.
+Gradients with two-sided Lipschitz bounds on a real Hilbert space are bijective. The proof combines finite directional improvement, geometric decay of the inversion residual, and closedness of the gradient range.
 -/
 
 noncomputable section
@@ -30,27 +19,26 @@ namespace UN.GradientMap
 variable {H : Type*} [NormedAddCommGroup H] [InnerProductSpace ℝ H] [CompleteSpace H]
 
 /-!
-## Actual constructions
+## Finite differences and normalized ascent
 -/
 
-/-- The directional finite difference of the energy with scalar increment `h` and direction `v`. Its analytic estimates require `0 < h`; the expression itself is a total real-valued function. -/
+/-- The finite difference of `E` in direction `v` with increment `h`. -/
 def directionalDifference (E : H → ℝ) (v : H) (h : ℝ) (x : H) : ℝ :=
   (E (x + h • v) - E x) / h
 
-/-- The gradient of `directionalDifference` when `g` is the gradient of `E` and the finite-difference increment is nonzero. -/
+/-- The finite difference of `g` in direction `v` with increment `h`. -/
 def differenceGradient (g : H → H) (v : H) (h : ℝ) (x : H) : H :=
   h⁻¹ • (g (x + h • v) - g x)
 
-/-- One ascent update in the normalized vector-field direction. The definition is total, including at zeros of the field; its ascent estimates assume that the field is bounded away from zero. -/
+/-- A normalized ascent step for the field `V`. -/
 private def normalizedAscentStep (V : H → H) (τ : ℝ) (x : H) : H :=
   x + (τ / ‖V x‖) • V x
 
-/-- A finite recursive trajectory of normalized ascent updates. -/
 private def finiteAscent (V : H → H) (τ : ℝ) (x₀ : H) : ℕ → H
   | 0 => x₀
   | N + 1 => normalizedAscentStep V τ (finiteAscent V τ x₀ N)
 
-/-- The contraction factor for the *squared residual* in the inversion proof. This is unrelated to the ADA multiplier `UN.q`. -/
+/-- Contraction factor for the squared inversion residual. -/
 private def residualFactor (μ L : ℝ) : ℝ :=
   1 - μ ^ 2 / (2 * L ^ 2)
 
@@ -58,7 +46,6 @@ private def residualFactor (μ L : ℝ) : ℝ :=
 ## Directional finite differences
 -/
 
-/-- Differentiate the finite difference using translation, subtraction, and scalar multiplication. No derivative of `g` is required. -/
 theorem hasGradientAt_directionalDifference
     (E : H → ℝ) (g : H → H)
     (hGrad : ∀ x, HasGradientAt E (g x) x)
@@ -111,7 +98,7 @@ theorem differenceGradient_norm_sub_le
       mul_le_mul_of_nonneg_left (by linarith [hUpper x₁ x₂]) (inv_nonneg.mpr hIncrement.le)
     _ = _ := by ring
 
-/-- The finite difference approximates the directional gradient component. This follows from `abs_taylor_remainder_le` with displacement `h • v`. -/
+/-- The finite difference approximates the directional gradient component. -/
 theorem abs_directionalDifference_sub_inner_le
     (E : H → ℝ) (g : H → H) (L : ℝ)
     (hGrad : ∀ x, HasGradientAt E (g x) x)
@@ -133,9 +120,7 @@ theorem abs_directionalDifference_sub_inner_le
 ## Finite normalized ascent
 -/
 
-/-- The finite construction underlying directional improvement. Its endpoint lies within `R` of the start, and the two explicit error terms can be made arbitrarily small by choosing the increment first and the number of steps next.
-
-Use lower Taylor bounds at every finite ascent step and induct on the step count. Then transfer the energy difference to the directional gradient component using `abs_directionalDifference_sub_inner_le` at both endpoints. -/
+/-- Finite normalized ascent gives directional improvement within radius `R`, with errors controlled by `h` and `N`. -/
 private theorem finiteAscent_directional_estimates
     (E : H → ℝ) (g : H → H) (μ L : ℝ)
     (hGrad : ∀ x, HasGradientAt E (g x) x)
@@ -210,7 +195,7 @@ private theorem finiteAscent_directional_estimates
   dsimp only [E_h] at hi
   linarith [hi.2]
 
-/-- Arbitrarily accurate directional improvement within a prescribed radius. This is an existential finite construction, with no maximizer or compactness assumption. Apply `finiteAscent_directional_estimates` after making its two error terms sum to less than `ε`. -/
+/-- Directional improvement of at least `μ * R - ε` within radius `R`. -/
 theorem exists_directional_improvement
     (E : H → ℝ) (g : H → H) (μ L : ℝ)
     (hGrad : ∀ x, HasGradientAt E (g x) x)
@@ -246,7 +231,6 @@ theorem exists_directional_improvement
 ## Residual contraction and surjectivity
 -/
 
-/-- The inversion residual factor lies in `[0, 1)`. -/
 private theorem residualFactor_nonneg_lt_one
     (μ L : ℝ)
     (hμ_pos : 0 < μ) (hμ_le_L : μ ≤ L) :
@@ -262,7 +246,7 @@ private theorem residualFactor_nonneg_lt_one
   · have : 0 < μ ^ 2 / (2 * L ^ 2) := by positivity
     linarith
 
-/-- One strict improvement in squared residual for an arbitrary target. For nonzero residual `r₀`, apply directional improvement with radius `μ * r₀ / L^2` and error `μ^2 * r₀ / (4 * L^2)`. For zero residual keep the point. The split also handles the zero-dimensional Hilbert space without a unit-vector existence assumption. -/
+/-- Directional improvement contracts the squared inversion residual. -/
 private theorem exists_residual_sq_le
     (E : H → ℝ) (g : H → H) (μ L : ℝ)
     (hGrad : ∀ x, HasGradientAt E (g x) x)
@@ -307,7 +291,7 @@ private theorem exists_residual_sq_le
   rw [← halg, hn]
   nlinarith
 
-/-- Classical choice of residual improvements followed by natural-number recursion yields a sequence with a geometric squared-residual bound. No continuity of the chosen update map is needed. -/
+/-- Repeated contraction gives a sequence whose inversion residual decays geometrically. -/
 private theorem exists_residual_sequence
     (E : H → ℝ) (g : H → H) (μ L : ℝ)
     (hGrad : ∀ x, HasGradientAt E (g x) x)
@@ -334,11 +318,7 @@ private theorem exists_residual_sequence
         mul_le_mul_of_nonneg_left ih hq
       _ = _ := by ring
 
-/-- Main independent inversion theorem.
-
-Use `exists_residual_sequence` starting at zero. The squared residual tends to zero because `residualFactor` belongs to `[0, 1)`. The lower norm bound and completeness make the gradient range closed; continuity follows from the upper norm bound. Consequently the limit of the gradient images belongs to the range.
-
-The argument names in this signature form the interface consumed by UN geometry. -/
+/-- A gradient with two-sided Lipschitz bounds is surjective. -/
 theorem surjective_of_bounds
     (E : H → ℝ) (g : H → H) (μ L : ℝ)
     (hGrad : ∀ x, HasGradientAt E (g x) x)
@@ -371,7 +351,7 @@ theorem surjective_of_bounds
   exact hclosed.mem_of_tendsto hlim (Filter.Eventually.of_forall (fun n => ⟨x n, rfl⟩))
 
 omit [InnerProductSpace ℝ H] [CompleteSpace H] in
-/-- Injectivity requires only the positive lower bound. -/
+/-- A positive lower norm bound implies injectivity. -/
 theorem injective_of_lower_bound
     (g : H → H) (μ : ℝ) (hμ_pos : 0 < μ)
     (hLower : ∀ x₁ x₂, μ * ‖x₁ - x₂‖ ≤ ‖g x₁ - g x₂‖) :
@@ -382,7 +362,6 @@ theorem injective_of_lower_bound
   have : ‖x₁ - x₂‖ = 0 := by nlinarith [norm_nonneg (x₁ - x₂)]
   exact sub_eq_zero.mp (norm_eq_zero.mp this)
 
-/-- Combine the independent surjectivity theorem with the elementary lower-bound injectivity argument. -/
 theorem bijective_of_bounds
     (E : H → ℝ) (g : H → H) (μ L : ℝ)
     (hGrad : ∀ x, HasGradientAt E (g x) x)
@@ -395,7 +374,7 @@ theorem bijective_of_bounds
       hμ_pos hμ_le_L hLower hUpper⟩
 
 omit [InnerProductSpace ℝ H] [CompleteSpace H] in
-/-- A right inverse inherits the reciprocal norm bound. This formulation is independent of the particular inverse chosen by a later module. -/
+/-- A right inverse inherits the reciprocal norm bound. -/
 theorem inverse_norm_sub_le
     (g gInv : H → H) (μ : ℝ)
     (hμ_pos : 0 < μ)

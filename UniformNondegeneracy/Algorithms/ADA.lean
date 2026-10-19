@@ -8,7 +8,7 @@ public import UniformNondegeneracy.Algorithms.ADA.Complexity
 @[expose] public section
 
 /-!
-# Alternating descent-ascent: one application of UN theory
+# Alternating descent–ascent
 
-The file path identifies the application area. Public mathematical names remain in `UN.ADA`; importing this module adds the ADA development explicitly.
+Iterations, Lyapunov estimates, and complexity bounds for ADA.
 -/

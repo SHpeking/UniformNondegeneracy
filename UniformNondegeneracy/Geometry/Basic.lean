@@ -1,7 +1,7 @@
 module
 
 public import UniformNondegeneracy.Core.Basic
-public import UniformNondegeneracy.Analysis.Bregman
+public import UniformNondegeneracy.Analysis.GradientBounds
 public import UniformNondegeneracy.Geometry.GradientInverse
 
 @[expose] public section
@@ -9,11 +9,9 @@ public import UniformNondegeneracy.Geometry.GradientInverse
 open scoped RealInnerProductSpace
 
 /-!
-# Consequences of the UN secant assumptions
+# Geometry of UN energies
 
-The data defined here depend on the energy and gradient, not on a chosen curvature certificate. Theorems in the `IsUN` namespace supply their intended geometric interpretation under the UN hypotheses.
-
-In particular, bijectivity is a consequence of the secants and the gradient identity, obtained from `GradientMap.surjective_of_bounds`. No surjectivity or homeomorphism assumption is added to `IsUN`.
+UN gradients are bi-Lipschitz homeomorphisms with a unique zero. The secant inequalities also give quadratic Bregman bounds.
 -/
 
 noncomputable section
@@ -23,18 +21,18 @@ namespace UN
 variable {H : Type*} [NormedAddCommGroup H] [InnerProductSpace ℝ H] [CompleteSpace H]
 
 /-!
-## Constructions independent of curvature certificates
+## Inverse gradient and stationary point
 -/
 
-/-- A chosen inverse of the gradient map. This is a total definition for any map; its inverse identities are proved below under `IsUN`. -/
+/-- A chosen inverse of the gradient map. -/
 def inverseGradient (g : H → H) : H → H :=
   Function.invFun g
 
-/-- The distinguished stationary point, obtained by inverting the zero vector. The UN assumptions establish that this point is the unique zero of `g`. -/
+/-- The stationary point, obtained by inverting the zero vector. -/
 def stationaryPoint (g : H → H) : H :=
   inverseGradient g 0
 
-/-- The energy at the distinguished stationary point. -/
+/-- The stationary energy value. -/
 def stationaryValue (E : H → ℝ) (g : H → H) : ℝ :=
   E (stationaryPoint g)
 
@@ -46,20 +44,11 @@ local notation "D" => bregman E g
 local notation "xStar" => stationaryPoint g
 local notation "EStar" => stationaryValue E g
 
-omit [CompleteSpace H] in
-/-- Completing the square in a two-sided secant expression. -/
-theorem centered_secant_identity (u v : H) (a b : ℝ) :
-    ‖u - ((a - b) / 2) • v‖ ^ 2 - ((a + b) / 2) ^ 2 * ‖v‖ ^ 2 = ⟪u + b • v, u - a • v⟫ := by
-  simp only [norm_sub_sq_real, norm_smul, Real.norm_eq_abs, mul_pow, sq_abs,
-    inner_sub_right, inner_add_left, real_inner_smul_left, real_inner_smul_right,
-    real_inner_self_eq_norm_sq, real_inner_comm v u]
-  ring
-
 /-!
 ## Centered forms of the secant inequalities
 -/
 
-/-- Centered norm form of the inner secant inequality. Expand the squared norm, use `IsUN.inner_secant`, and take nonnegative square roots. -/
+/-- Centered norm form of the inner secant inequality. -/
 theorem IsUN.inner_centered (hUN : IsUN bounds E g) (x₁ x₂ : H) :
     bounds.innerRadius * ‖x₁ - x₂‖ ≤ ‖g x₁ - g x₂ - bounds.innerCenter • (x₁ - x₂)‖ := by
   have hs := hUN.inner_secant x₁ x₂
@@ -79,7 +68,7 @@ theorem IsUN.outer_centered (hUN : IsUN bounds E g) (x₁ x₂ : H) :
   have hn := mul_nonneg hr (norm_nonneg (x₁ - x₂))
   nlinarith
 
-/-- Squared form, convenient for the later refined secant and envelope algebra. -/
+/-- Squared inner centered secant inequality. -/
 theorem IsUN.inner_centered_sq (hUN : IsUN bounds E g) (x₁ x₂ : H) :
     bounds.innerRadius ^ 2 * ‖x₁ - x₂‖ ^ 2 ≤ ‖g x₁ - g x₂ - bounds.innerCenter • (x₁ - x₂)‖ ^ 2 := by
   have h := hUN.inner_centered x₁ x₂
@@ -130,7 +119,6 @@ theorem IsUN.outer_inner_bounds (hUN : IsUN bounds E g) (x₁ x₂ : H) :
 ## Global invertibility
 -/
 
-/-- Continuity follows from the upper norm bound. -/
 theorem IsUN.gradient_continuous (hUN : IsUN bounds E g) :
     Continuous g := by
   have hLip : LipschitzWith ⟨bounds.lMax, le_of_lt bounds.lMax_pos⟩ g := by
@@ -140,37 +128,29 @@ theorem IsUN.gradient_continuous (hUN : IsUN bounds E g) :
     exact_mod_cast hUN.norm_sub_le_upper x₁ x₂
   exact hLip.continuous
 
-/-- Injectivity follows from the positive lower norm bound. -/
 theorem IsUN.gradient_injective (hUN : IsUN bounds E g) :
     Function.Injective g := by
   apply GradientMap.injective_of_lower_bound g bounds.muMin
-  · -- Positivity of the minimum of the two positive inner bounds.
-    exact bounds.muMin_pos
+  · exact bounds.muMin_pos
   · exact hUN.lower_norm_sub_le
 
-/-- The only global inversion input is the independent Hilbert-space theorem for gradients with two-sided Lipschitz bounds. The remaining scalar side goals follow from the positivity and ordering fields of `CurvatureBounds`. -/
 theorem IsUN.gradient_surjective (hUN : IsUN bounds E g) :
     Function.Surjective g := by
   apply GradientMap.surjective_of_bounds E g bounds.muMin bounds.lMax
   · exact hUN.has_gradient
-  · -- `0 < min muPlus muMinus`.
-    exact bounds.muMin_pos
-  · -- `min muPlus muMinus ≤ max lPlus lMinus`.
-    exact bounds.muMin_le_lMax
+  · exact bounds.muMin_pos
+  · exact bounds.muMin_le_lMax
   · exact hUN.lower_norm_sub_le
   · exact hUN.norm_sub_le_upper
 
-/-- The gradient is globally bijective under the secant-only UN assumptions. -/
 theorem IsUN.gradient_bijective (hUN : IsUN bounds E g) :
     Function.Bijective g := by
   exact ⟨hUN.gradient_injective, hUN.gradient_surjective⟩
 
-/-- Applying the gradient after its chosen inverse gives the target. -/
 theorem IsUN.gradient_inverseGradient (hUN : IsUN bounds E g) (p : H) :
     g (inverseGradient g p) = p := by
   exact Function.rightInverse_invFun hUN.gradient_surjective p
 
-/-- Applying the chosen inverse after the gradient gives the original point. -/
 theorem IsUN.inverseGradient_gradient (hUN : IsUN bounds E g) (x : H) :
     inverseGradient g (g x) = x := by
   exact Function.leftInverse_invFun hUN.gradient_injective x
@@ -183,7 +163,6 @@ theorem IsUN.inverse_norm_sub_le (hUN : IsUN bounds E g) (p₁ p₂ : H) :
   · exact hUN.lower_norm_sub_le
   · exact hUN.gradient_inverseGradient
 
-/-- Continuity of the inverse follows from its reciprocal norm bound. -/
 theorem IsUN.inverseGradient_continuous (hUN : IsUN bounds E g) :
     Continuous (inverseGradient g) := by
   have hLip : LipschitzWith ⟨bounds.muMin⁻¹, inv_nonneg.mpr (le_of_lt bounds.muMin_pos)⟩ (inverseGradient g) := by
@@ -193,7 +172,7 @@ theorem IsUN.inverseGradient_continuous (hUN : IsUN bounds E g) :
     exact_mod_cast hUN.inverse_norm_sub_le x₁ x₂
   exact hLip.continuous
 
-/-- The gradient, now equipped with its proved continuous inverse. This is an actual structure construction; all mathematical properties are theorem fields. -/
+/-- The gradient as a homeomorphism of `H`. -/
 def IsUN.gradientHomeomorph (hUN : IsUN bounds E g) : H ≃ₜ H where
   toEquiv :=
     { toFun := g
@@ -203,12 +182,10 @@ def IsUN.gradientHomeomorph (hUN : IsUN bounds E g) : H ≃ₜ H where
   continuous_toFun := hUN.gradient_continuous
   continuous_invFun := hUN.inverseGradient_continuous
 
-/-- The bundled homeomorphism has exactly the supplied gradient as its map. -/
 theorem IsUN.gradientHomeomorph_apply (hUN : IsUN bounds E g) (x : H) :
     hUN.gradientHomeomorph x = g x := by
   rfl
 
-/-- The inverse of the bundled homeomorphism is the certificate-independent chosen inverse. -/
 theorem IsUN.gradientHomeomorph_symm_apply (hUN : IsUN bounds E g) (p : H) :
     hUN.gradientHomeomorph.symm p = inverseGradient g p := by
   rfl
@@ -217,12 +194,10 @@ theorem IsUN.gradientHomeomorph_symm_apply (hUN : IsUN bounds E g) (p : H) :
 ## The unique stationary point
 -/
 
-/-- The distinguished point is stationary. -/
 theorem IsUN.gradient_stationaryPoint (hUN : IsUN bounds E g) :
     g xStar = 0 := by
   exact hUN.gradient_inverseGradient 0
 
-/-- Every stationary point is the distinguished stationary point. -/
 theorem IsUN.gradient_eq_zero_iff (hUN : IsUN bounds E g) (x : H) :
     g x = 0 ↔ x = xStar := by
   constructor
@@ -241,19 +216,18 @@ theorem IsUN.unique_stationaryPoint (hUN : IsUN bounds E g) :
 ## Basic Bregman identities and one-sided bounds
 -/
 
-/-- At the stationary point, the Bregman difference is the energy difference. -/
 theorem IsUN.bregman_stationaryPoint (hUN : IsUN bounds E g) (x : H) :
     D x xStar = E x - EStar := by
   simp [bregman, stationaryValue, hUN.gradient_stationaryPoint]
 
-/-- The negative-side outer bound gives the lower quadratic Bregman estimate. This uses the one-sided directional consequence of the outer secant and integration along a segment; it retains the asymmetric constant `lMinus`. -/
+/-- The negative outer curvature gives the lower quadratic Bregman bound. -/
 theorem IsUN.bregman_lower (hUN : IsUN bounds E g) (x₁ x₂ : H) :
     -(L₋ / 2) * ‖x₁ - x₂‖ ^ 2 ≤ D x₁ x₂ := by
   have h := GradientMap.taylor_lower_bound_of_inner E g (-L₋)
     hUN.has_gradient (fun x₁ x₂ => (hUN.outer_inner_bounds x₁ x₂).1) x₂ (x₁ - x₂)
   simpa only [add_sub_cancel, bregman, neg_div] using h
 
-/-- The positive-side outer bound gives the upper quadratic Bregman estimate. -/
+/-- The positive outer curvature gives the upper quadratic Bregman bound. -/
 theorem IsUN.bregman_upper (hUN : IsUN bounds E g) (x₁ x₂ : H) :
     D x₁ x₂ ≤ (L₊ / 2) * ‖x₁ - x₂‖ ^ 2 := by
   have h := GradientMap.taylor_upper_bound_of_inner E g L₊
@@ -265,7 +239,6 @@ theorem IsUN.bregman_bounds (hUN : IsUN bounds E g) (x₁ x₂ : H) :
     D x₁ x₂ ≤ L₊ / 2 * ‖x₁ - x₂‖ ^ 2 := by
   exact ⟨hUN.bregman_lower x₁ x₂, hUN.bregman_upper x₁ x₂⟩
 
-/-- The intrinsic outer curvatures give a general quadratic Bregman certificate. -/
 theorem IsUN.hasBregmanBounds (hUN : IsUN bounds E g) :
     HasBregmanBounds E g L₊ L₋ :=
   ⟨hUN.bregman_lower, hUN.bregman_upper⟩

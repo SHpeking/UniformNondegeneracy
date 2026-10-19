@@ -7,13 +7,11 @@ public import Mathlib.Tactic
 
 /-!
 # Prefix minima of real sequences
-
-The observation horizon includes both index zero and the final index. These elementary sequence facts do not require a convergence certificate or an algorithm.
 -/
 
 namespace UN
 
-/-- The smallest residual observed through `T`, including index zero. -/
+/-- The minimum of `r 0, …, r T`. -/
 def prefixMin (r : ℕ → ℝ) : ℕ → ℝ
   | 0 => r 0
   | T + 1 => min (prefixMin r T) (r (T + 1))
@@ -24,7 +22,6 @@ def prefixMin (r : ℕ → ℝ) : ℕ → ℝ
 @[simp] theorem prefixMin_succ (r : ℕ → ℝ) (T : ℕ) :
     prefixMin r (T + 1) = min (prefixMin r T) (r (T + 1)) := rfl
 
-/-- The recursive minimum is attained at an actual index. -/
 theorem prefixMin_attained (r : ℕ → ℝ) (T : ℕ) :
     ∃ t ≤ T, prefixMin r T = r t := by
   induction T with
@@ -57,7 +54,6 @@ theorem prefixMin_nonneg (r : ℕ → ℝ)
     0 ≤ prefixMin r T := by
   exact le_prefixMin r T (fun i _ => hResidual i)
 
-/-- Increasing the observation horizon can only decrease the best residual. -/
 theorem prefixMin_antitone (r : ℕ → ℝ) :
     Antitone (prefixMin r) := by
   apply antitone_nat_of_succ_le

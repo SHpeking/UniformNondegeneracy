@@ -1,19 +1,17 @@
 module
 
 public import UniformNondegeneracy.Geometry.Basic
+public import UniformNondegeneracy.Geometry.InverseEnergy
 
 @[expose] public section
 
 open scoped RealInnerProductSpace
 
 /-!
-# Dual energy and Bregman estimates
+# Legendre transform and Bregman estimates
 
-The dual is defined using the inverse gradient, not a convex conjugate. Its differentiability is proved by a quadratic remainder estimate, so neither a Hessian nor differentiability of the inverse map is assumed.
+The Legendre transform preserves UN with reciprocal curvature bounds and is involutive. Bregman reciprocity yields signed PL and refined secant bounds.
 -/
-
-open Filter Asymptotics
-open scoped Topology
 
 noncomputable section
 
@@ -21,43 +19,9 @@ namespace UN
 
 variable {H : Type*} [NormedAddCommGroup H] [InnerProductSpace ℝ H] [CompleteSpace H]
 
-namespace GradientMap
-
-/-- The inverse energy is differentiable even when its inverse map has no derivative. -/
-theorem hasGradientAt_inverseEnergy
-    (E : H → ℝ) (g gInv : H → H) (LInv : ℝ)
-    (hGrad : ∀ x, HasGradientAt E (g x) x)
-    (hRight : ∀ p, g (gInv p) = p)
-    (hContinuous : Continuous gInv)
-    (hLip : ∀ p₁ p₂, ‖gInv p₁ - gInv p₂‖ ≤ LInv * ‖p₁ - p₂‖)
-    (p : H) :
-    HasGradientAt (fun p₁ => ⟪p₁, gInv p₁⟫ - E (gInv p₁)) (gInv p) p := by
-  apply hasGradientAt_iff_isLittleO.mpr
-  have hinv : (fun p₁ => gInv p₁ - gInv p) =O[𝓝 p] (fun p₁ => p₁ - p) :=
-    isBigO_of_le' _ (fun p₁ => hLip p₁ p)
-  have hrem := (hasGradientAt_iff_isLittleO.mp (hGrad (gInv p))).comp_tendsto
-    (hContinuous.tendsto p)
-  simp only [hRight, Function.comp_def] at hrem
-  have hsmall : (fun p₁ => ‖gInv p₁ - gInv p‖) =o[𝓝 p] (fun _ => (1 : ℝ)) := by
-    apply (isLittleO_one_iff ℝ).mpr
-    simpa using ((hContinuous.tendsto p).sub_const (gInv p)).norm
-  have hinner : (fun p₁ => ⟪p₁ - p, gInv p₁ - gInv p⟫) =o[𝓝 p] (fun p₁ => p₁ - p) := by
-    have hprod := hsmall.mul_isBigO (isBigO_refl (fun p₁ : H => ‖p₁ - p‖) (𝓝 p))
-    simp only [one_mul] at hprod
-    apply (isBigO_of_le (𝓝 p) (fun p₁ => ?_)).trans_isLittleO hprod |>.of_norm_right
-    simpa only [Real.norm_eq_abs, abs_mul, abs_norm, mul_comm] using
-      norm_inner_le_norm (𝕜 := ℝ) (p₁ - p) (gInv p₁ - gInv p)
-  convert hinner.sub (hrem.trans_isBigO hinv) using 1
-  ext p₁
-  simp only [inner_sub_left, inner_sub_right]
-  rw [real_inner_comm (gInv p) p₁, real_inner_comm (gInv p) p]
-  ring
-
-end GradientMap
-
-/-- Dual energy $E^\sharp(p)=\langle p,g^{-1}(p)\rangle-E(g^{-1}(p))$, evaluated at the dual point `p`. -/
+/-- The Legendre transform $E^{\sharp}(p) = \langle p,g^{-1}(p)\rangle - E(g^{-1}(p))$. -/
 def dualEnergy (E : H → ℝ) (g : H → H) (p : H) : ℝ :=
-  ⟪p, inverseGradient g p⟫ - E (inverseGradient g p)
+  inverseEnergy E (inverseGradient g) p
 
 omit [CompleteSpace H] in
 private lemma reciprocal_secant (x p : H) (a b : ℝ)
@@ -104,27 +68,28 @@ theorem dual (hUN : IsUN bounds E g) :
     have h := hUN.inner_secant (gInv p₁) (gInv p₂)
     simpa only [hUN.gradient_inverseGradient, neg_nonpos] using h
 
+/-- Applying the Legendre transform twice recovers the original energy. -/
 theorem dualEnergy_dualEnergy (hUN : IsUN bounds E g) :
     dualEnergy Esharp gInv = E := by
   funext x
   have hinv : inverseGradient gInv x = g x := by
     simpa only [hUN.inverseGradient_gradient] using hUN.dual.inverseGradient_gradient (g x)
-  simp only [dualEnergy, hinv, hUN.inverseGradient_gradient]
+  simp only [dualEnergy, inverseEnergy, hinv, hUN.inverseGradient_gradient]
   rw [real_inner_comm x (g x)]
   ring
 
 theorem bregman_reciprocity (hUN : IsUN bounds E g) (x₁ x₂ : H) :
     D x₁ x₂ = bregman Esharp gInv (g x₂) (g x₁) := by
-  simp only [bregman, dualEnergy, hUN.inverseGradient_gradient, inner_sub_right]
-  rw [real_inner_comm x₁ (g x₂), real_inner_comm x₁ (g x₁)]
-  ring
+  change D x₁ x₂ = bregman (inverseEnergy E gInv) gInv (g x₂) (g x₁)
+  simpa only [hUN.inverseGradient_gradient] using
+    (bregman_inverseEnergy E g gInv hUN.gradient_inverseGradient (g x₂) (g x₁)).symm
 
 theorem dual_bregman_bounds (hUN : IsUN bounds E g) (p₁ p₂ : H) :
     -(1 / (2 * μ₋)) * ‖p₁ - p₂‖ ^ 2 ≤ bregman Esharp gInv p₁ p₂ ∧
     bregman Esharp gInv p₁ p₂ ≤ (1 / (2 * μ₊)) * ‖p₁ - p₂‖ ^ 2 := by
   simpa only [CurvatureBounds.dual, div_eq_mul_inv, mul_inv_rev, one_mul] using hUN.dual.bregman_bounds p₁ p₂
 
-/-- The two signed PL estimates; energy may lie on either side of its stationary value. PL stands for Polyak–Łojasiewicz. -/
+/-- Signed Polyak–Łojasiewicz bounds relative to the stationary value. -/
 theorem signedPL (hUN : IsUN bounds E g) (x : H) :
     -(‖g x‖ ^ 2 / (2 * μ₋)) ≤ E x - EStar ∧
     E x - EStar ≤ ‖g x‖ ^ 2 / (2 * μ₊) := by
@@ -133,7 +98,7 @@ theorem signedPL (hUN : IsUN bounds E g) (x : H) :
   simpa only [hUN.gradient_stationaryPoint, zero_sub, norm_neg,
     one_div, neg_mul, div_eq_mul_inv, mul_comm, one_mul, mul_neg] using h
 
-/-- The general Bregman interpolation estimate applied to the inverse-gradient energy. -/
+/-- An upper bound for the dual Bregman difference in terms of primal and dual secants. -/
 theorem dual_bregman_interpolation (hUN : IsUN bounds E g) (p₁ p₂ : H) :
     bregman Esharp gInv p₁ p₂ ≤
       (‖p₁ - p₂‖ ^ 2 + 2 * μ₋ * ⟪p₁ - p₂, gInv p₁ - gInv p₂⟫ - μ₊ * μ₋ * ‖gInv p₁ - gInv p₂‖ ^ 2) / (2 * (μ₊ + μ₋)) := by

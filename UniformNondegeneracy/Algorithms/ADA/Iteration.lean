@@ -6,11 +6,9 @@ public import UniformNondegeneracy.Analysis.PrefixMin
 @[expose] public section
 
 /-!
-# Alternating descent-ascent trajectories
+# Alternating descent–ascent trajectories
 
-This file defines the algorithm before assuming that its gradient map comes from a UN energy.  `trajectory` counts individual gradient updates; `cycleStart` and `cycleMiddle` count descent-ascent cycles.  The public trajectory permits either initial phase.
-
-The minus sign in `gradientStep` is deliberate: positive `τ` denotes descent and negative `τ` denotes ascent.
+`trajectory` counts individual gradient updates; `cycleStart` and `cycleMiddle` count descent–ascent cycles. The initial phase may be descent or ascent.
 -/
 
 noncomputable section
@@ -23,13 +21,11 @@ variable {H : Type*} [NormedAddCommGroup H] [InnerProductSpace ℝ H]
 
 namespace ADA
 
-/-- The phase used for one update; both choices are allowed initially. -/
 inductive Phase where
   | descent
   | ascent
   deriving DecidableEq, Repr
 
-/-- Exchange descent and ascent. -/
 def Phase.flip : Phase → Phase
   | .descent => .ascent
   | .ascent => .descent
@@ -62,12 +58,11 @@ theorem phaseAt_odd (firstPhase : Phase) (t : ℕ) :
     phaseAt firstPhase (2 * t + 1) = firstPhase.flip := by
   simp [phaseAt]
 
-/-- Apply one descent or ascent update according to `phase`. -/
 def step (g : H → H) (Λ : Scales) : Phase → H → H
   | .descent => descentStep g Λ
   | .ascent => ascentStep g Λ
 
-/-- Full ADA trajectory; the initial point has index zero. -/
+/-- ADA iterates from index zero, with the chosen initial phase. -/
 def trajectory (g : H → H) (Λ : Scales)
     (firstPhase : Phase) (x₀ : H) : ℕ → H
   | 0 => x₀
@@ -81,7 +76,7 @@ def trajectory (g : H → H) (Λ : Scales)
     (firstPhase : Phase) (x₀ : H) (k : ℕ) :
     trajectory g Λ firstPhase x₀ (k + 1) = step g Λ (phaseAt firstPhase k) (trajectory g Λ firstPhase x₀ k) := rfl
 
-/-- Discarding a trajectory prefix changes only the initial point and phase. -/
+/-- A trajectory tail starts from the corresponding point and phase. -/
 theorem trajectory_tail (g : H → H) (Λ : Scales)
     (firstPhase : Phase) (x₀ : H) (k₀ k : ℕ) :
     trajectory g Λ (phaseAt firstPhase k₀) (trajectory g Λ firstPhase x₀ k₀) k = trajectory g Λ firstPhase x₀ (k₀ + k) := by
@@ -105,16 +100,16 @@ theorem trajectory_of_gradient_eq_zero (g : H → H) (Λ : Scales)
     rw [trajectory_succ, ih]
     cases phaseAt firstPhase k <;> simp [step, descentStep, ascentStep, gradientStep, hStationary]
 
-/-- The canonical two-update map: first descent, then ascent. -/
+/-- One descent step followed by one ascent step. -/
 def descentAscentCycle (g : H → H) (Λ : Scales) (x : H) : H :=
   ascentStep g Λ (descentStep g Λ x)
 
-/-- Point before descent in canonical cycle `t`; this is $y_t$. -/
+/-- Point before descent in cycle `t`: $y_t$. -/
 def cycleStart (g : H → H) (Λ : Scales) (x₀ : H) : ℕ → H
   | 0 => x₀
   | t + 1 => descentAscentCycle g Λ (cycleStart g Λ x₀ t)
 
-/-- Point after descent and before ascent in canonical cycle `t`; this is $z_t$. -/
+/-- Point after descent and before ascent in cycle `t`: $z_t$. -/
 def cycleMiddle (g : H → H) (Λ : Scales) (x₀ : H) (t : ℕ) : H :=
   descentStep g Λ (cycleStart g Λ x₀ t)
 
@@ -156,7 +151,7 @@ theorem trajectory_neg_swap (g : H → H) (Λ : Scales)
       split <;> rfl
     rw [hp, step_neg_swap]
 
-/-- The best gradient norm among all iterates from zero through `N`. -/
+/-- Minimum gradient norm over iterates `0, …, N`. -/
 def bestResidual (g : H → H) (Λ : Scales)
     (firstPhase : Phase) (x₀ : H) (N : ℕ) : ℝ :=
   prefixMin (fun k => ‖g (trajectory g Λ firstPhase x₀ k)‖) N

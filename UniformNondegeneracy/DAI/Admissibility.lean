@@ -6,44 +6,44 @@ public import UniformNondegeneracy.DAI.Parameters
 @[expose] public section
 
 /-!
-# Admissible scales and effective curvature bounds
+# Admissible scales, multipliers, and effective curvature bounds
 
-Outer compatibility controls the quadratic models. Full admissibility additionally places the scale difference in the inner gap, yielding a multiplier below one and a positive condition number. Strict admissibility strengthens the outer inequalities for interior-envelope arguments.
+The maximal multiplier `q` satisfies $0 \le q < 1$ at admissible scales, giving the condition number $\kappa = \frac{1}{1-q}$. Effective curvature bounds center the inner gap at `Λ.center` and set the outer bounds to the selected scales.
 -/
 
 namespace UN.DAI
 noncomputable section
 
-/-- The selected scales dominate the outer curvature bounds. No inner-gap condition is imposed. -/
+/-- The selected scales dominate the outer curvature bounds. -/
 structure OuterCompatible (bounds : CurvatureBounds) (Λ : Scales) : Prop where
   lPlus_le_plus : bounds.lPlus ≤ Λ.plus
   lMinus_le_minus : bounds.lMinus ≤ Λ.minus
 
-/-- Outer-compatible scales whose difference lies in the inner gap. This is the contractive regime used by the current UN-to-DAI and ADA theorems. -/
+/-- Outer-compatible scales whose difference lies in the inner gap. -/
 structure Admissible (bounds : CurvatureBounds) (Λ : Scales) : Prop
     extends OuterCompatible bounds Λ where
   neg_muMinus_lt_difference : -bounds.muMinus < Λ.difference
   difference_lt_muPlus : Λ.difference < bounds.muPlus
 
-/-- Interior-scale version used in the envelope-to-DAI proof. -/
+/-- Admissible scales strictly exceeding the outer curvature bounds. -/
 structure StrictAdmissible (bounds : CurvatureBounds) (Λ : Scales) : Prop
     extends Admissible bounds Λ where
   lPlus_lt_plus : bounds.lPlus < Λ.plus
   lMinus_lt_minus : bounds.lMinus < Λ.minus
 
-/-- Supremum of the two-step multiplier over the certified curvature bands. -/
+/-- Supremum of the two-step multiplier over the curvature bands. -/
 def q (bounds : CurvatureBounds) (Λ : Scales) : ℝ :=
   sSup (Λ.multiplier '' bounds.bands)
 
-/-- Effective condition number on admissible scales. This reciprocal is a total real-valued expression; positivity and the bound `1 ≤ kappa` are proved under admissibility. -/
+/-- The DAI condition number. -/
 def kappa (bounds : CurvatureBounds) (Λ : Scales) : ℝ := 1 / (1 - q bounds Λ)
 
-/-- Explicit positive denominator of `kappa` under admissibility. -/
+/-- Denominator in the explicit formula for `kappa`. -/
 def kappaDenominator (bounds : CurvatureBounds) (Λ : Scales) : ℝ :=
   min (bounds.muPlus * (bounds.muPlus - Λ.difference))
     (bounds.muMinus * (bounds.muMinus + Λ.difference))
 
-/-- Signed margin of the scale center within the inner gap. It equals the distance to the curvature bands when the center is inside the gap, and can be negative outside it. -/
+/-- Signed distance from `Λ.center` to the boundary of the inner gap. -/
 def gapMargin (bounds : CurvatureBounds) (Λ : Scales) : ℝ :=
   min (bounds.muPlus - Λ.center) (bounds.muMinus + Λ.center)
 
@@ -98,6 +98,10 @@ theorem centeredOuterRadius_eq (bounds : CurvatureBounds) (Λ : Scales) :
   rcases le_total (bounds.lPlus - Λ.center) (bounds.lMinus + Λ.center) with h | h
   · rw [max_eq_right h, abs_of_nonpos (by linarith)]; ring
   · rw [max_eq_left h, abs_of_nonneg (by linarith)]; ring
+
+/-!
+## Multiplier and condition number
+-/
 
 namespace OuterCompatible
 
@@ -213,6 +217,12 @@ theorem kappa_sub_one (hAdmissible : Admissible bounds Λ) :
   unfold kappa
   field_simp [ne_of_gt (sub_pos.mpr hAdmissible.q_lt_one)]; ring
 
+/-!
+## Effective curvature bounds
+
+The largest interval centered at `Λ.center` inside the original inner gap has radius `gapMargin` and endpoints `-effectiveMuMinus` and `effectiveMuPlus`.
+-/
+
 theorem center_mem_gap (hAdmissible : Admissible bounds Λ) :
     Λ.center ∈ Set.Ioo (-bounds.muMinus) bounds.muPlus := by
   dsimp [Scales.center]
@@ -294,7 +304,7 @@ theorem kappa_mul_steps_mul_effective_inner (hAdmissible : Admissible bounds Λ)
   unfold Scales.tauPlus Scales.tauMinus
   field_simp [ne_of_gt Λ.plus_pos, ne_of_gt Λ.minus_pos, ne_of_gt hAdmissible.kappaDenominator_pos]
 
-/-- The effective bounds used for the signed PL estimates in the Lyapunov proof. -/
+/-- Curvature bounds with outer magnitudes `Λ.plus`, `Λ.minus` and effective inner magnitudes. -/
 def effectiveBounds (hAdmissible : Admissible bounds Λ) : CurvatureBounds where
   muPlus := effectiveMuPlus bounds Λ
   muMinus := effectiveMuMinus bounds Λ
@@ -353,7 +363,7 @@ theorem centeredOuterRadius_pos (hAdmissible : Admissible bounds Λ) :
   apply lt_of_lt_of_le _ (le_max_left _ _)
   linarith [hAdmissible.center_mem_gap.2, bounds.muPlus_le_lPlus]
 
-/-- Symmetric auxiliary bounds for the centered energy; the original input remains asymmetric. -/
+/-- Symmetric curvature bounds for the centered energy. -/
 def centeredBounds (hAdmissible : Admissible bounds Λ) : CurvatureBounds where
   muPlus := gapMargin bounds Λ
   muMinus := gapMargin bounds Λ
@@ -389,6 +399,43 @@ theorem swap (hStrict : StrictAdmissible bounds Λ) :
   exact ⟨hStrict.toAdmissible.swap, hStrict.lMinus_lt_minus, hStrict.lPlus_lt_plus⟩
 
 end StrictAdmissible
+
+/-!
+## Outer and balanced scales
+-/
+
+/-- Scales equal to the two outer curvature magnitudes. -/
+def outerScales (bounds : CurvatureBounds) : Scales :=
+  ⟨bounds.lPlus, bounds.lMinus, bounds.lPlus_pos, bounds.lMinus_pos⟩
+
+/-- The smallest outer-compatible scales whose center equals the inner curvature center. -/
+def balancedScales (bounds : CurvatureBounds) : Scales where
+  plus := bounds.muPlus + bounds.maxBandWidth
+  minus := bounds.muMinus + bounds.maxBandWidth
+  plus_pos := add_pos_of_pos_of_nonneg bounds.muPlus_pos bounds.maxBandWidth_nonneg
+  minus_pos := add_pos_of_pos_of_nonneg bounds.muMinus_pos bounds.maxBandWidth_nonneg
+
+@[simp] theorem balancedScales_difference (bounds : CurvatureBounds) :
+    (balancedScales bounds).difference = bounds.muPlus - bounds.muMinus := by
+  unfold Scales.difference balancedScales
+  dsimp
+  ring
+
+theorem balancedScales_admissible (bounds : CurvatureBounds) : Admissible bounds (balancedScales bounds) := by
+  refine ⟨⟨?_, ?_⟩, ?_, ?_⟩
+  · change bounds.lPlus ≤ bounds.muPlus + bounds.maxBandWidth
+    have h := le_max_left (bounds.lPlus - bounds.muPlus) (bounds.lMinus - bounds.muMinus)
+    dsimp [CurvatureBounds.maxBandWidth]
+    linarith
+  · change bounds.lMinus ≤ bounds.muMinus + bounds.maxBandWidth
+    have h := le_max_right (bounds.lPlus - bounds.muPlus) (bounds.lMinus - bounds.muMinus)
+    dsimp [CurvatureBounds.maxBandWidth]
+    linarith
+  · rw [balancedScales_difference]
+    linarith [bounds.muPlus_pos]
+  · rw [balancedScales_difference]
+    linarith [bounds.muMinus_pos]
+
 
 end
 end UN.DAI
