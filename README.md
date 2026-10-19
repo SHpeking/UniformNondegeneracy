@@ -14,7 +14,7 @@ $$
 \langle\Delta g+L_-\Delta x,\Delta g-L_+\Delta x\rangle\le0\le\langle\Delta g+\mu_-\Delta x,\Delta g-\mu_+\Delta x\rangle.
 $$
 
-In particular, for $E\in C^2(\mathcal{H};\mathbb{R})$, this is equivalent to $\operatorname{spec}(\nabla^2 E(x))\subseteq\mathcal{S}$ for every $x\in\mathcal{H}$.
+In particular, for $E\in C^2(\mathcal{H};\mathbb{R})$, this is equivalent to $\mathrm{spec}(\nabla^2 E(x))\subseteq\mathcal{S}$ for every $x\in\mathcal{H}$.
 
 ## Structural theory
 
@@ -24,7 +24,7 @@ Uniform nondegeneracy gives rise to a rich geometric structure, extending classi
 
 For a UN energy $E$, the gradient $g$ is a **[global bi-Lipschitz homeomorphism](UniformNondegeneracy/Geometry/Basic.lean)**, giving a unique stationary point $x^\star=g^{-1}(0)$.
 
-Writing $[c]_\pm=\max\{\pm c,0\}$ for $c\in\mathbb{R}$, the classical Polyak–Łojasiewicz (PL) inequality is generalized as
+Writing $[c]_\pm=\max\lbrace\pm c,0\rbrace$ for $c\in\mathbb{R}$, the classical Polyak–Łojasiewicz (PL) inequality is generalized as
 
 $$
 \frac{1}{2}\|g(x)\|^2\ge\mu_+[E(x)-E(x^\star)]_++\mu_-[E(x)-E(x^\star)]_-,\quad\forall x\in\mathcal{H}.
@@ -55,7 +55,7 @@ $$
 For $s\in(-L_-^{-1},L_+^{-1})$, we consider the **[two-sided envelope](UniformNondegeneracy/Envelopes/Basic.lean)** defined by
 
 $$
-M_s(x)=\sup_{\xi\in\mathcal{H}}\left\{s\bigl(E(\xi)-E(x^\star)\bigr)-\frac{1}{2}\|\xi-x\|^2\right\},\quad x\in\mathcal{H}.
+M_s(x)=\sup_{\xi\in\mathcal{H}}\left\lbrace s\bigl(E(\xi)-E(x^\star)\bigr)-\frac{1}{2}\|\xi-x\|^2\right\rbrace,\quad x\in\mathcal{H}.
 $$
 
 The unique maximizer is $J_s(x)=(I-sg)^{-1}(x)$, and the derivatives recover the energy and gradient at this point:
@@ -64,7 +64,7 @@ $$
 \partial_s M_s(x)=E(J_s(x))-E(x^\star),\quad\nabla_x M_s(x)=J_s(x)-x=s g(J_s(x)).
 $$
 
-Its proximal operator is given by $\operatorname{prox}_{M_s}=J_s^{-1}=I-sg$.
+Its proximal operator is given by $\mathrm{prox}_{M_s}=J_s^{-1}=I-sg$.
 
 ### Descent–ascent structure
 
