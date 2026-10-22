@@ -24,56 +24,137 @@ theorem centered_secant_identity (u v : H) (a b : ℝ) :
     real_inner_self_eq_norm_sq, real_inner_comm v u]
   ring
 
+/-- An outer secant inequality bounds the norm by the larger curvature. -/
+theorem norm_le_of_outer_secant (u v : H) {a b : ℝ}
+    (ha : 0 ≤ a) (hb : 0 ≤ b) (hSecant : ⟪u + b • v, u - a • v⟫ ≤ 0) :
+    ‖u‖ ≤ max a b * ‖v‖ := by
+  rw [← centered_secant_identity] at hSecant
+  have hCentered : ‖u - ((a - b) / 2) • v‖ ≤ (a + b) / 2 * ‖v‖ := by
+    nlinarith [norm_nonneg (u - ((a - b) / 2) • v),
+      mul_nonneg (show 0 ≤ (a + b) / 2 by positivity) (norm_nonneg v)]
+  have hTriangle := norm_add_le (u - ((a - b) / 2) • v) (((a - b) / 2) • v)
+  rw [sub_add_cancel, norm_smul, Real.norm_eq_abs] at hTriangle
+  have hMax : (a + b) / 2 + |(a - b) / 2| = max a b := by
+    rcases le_total a b with hab | hba
+    · rw [max_eq_right hab, abs_of_nonpos (by linarith)]
+      ring
+    · rw [max_eq_left hba, abs_of_nonneg (by linarith)]
+      ring
+  rw [← hMax]
+  nlinarith
+
+variable [CompleteSpace H]
+
 /-- Symmetric global quadratic models imply the matching gradient norm bound. -/
-theorem HasBregmanBounds.norm_sub_le {E : H → ℝ} {g : H → H} {L : ℝ}
-    (hBounds : HasBregmanBounds E g L L) (hL : 0 ≤ L) (x₁ x₂ : H) :
-    ‖g x₁ - g x₂‖ ≤ L * ‖x₁ - x₂‖ := by
+theorem HasBregmanBounds.norm_sub_le {E : H → ℝ} {L : ℝ}
+    (hBounds : HasBregmanBounds L L E) (hL : 0 ≤ L) (x₁ x₂ : H) :
+    ‖gradient E x₁ - gradient E x₂‖ ≤ L * ‖x₁ - x₂‖ := by
   rcases hL.eq_or_lt with hZero | hPos
   · subst L
-    have hB (x₁ x₂ : H) : bregman E g x₁ x₂ = 0 := by
+    have hB (x₁ x₂ : H) : bregman E x₁ x₂ = 0 := by
       have h₁ := hBounds.lower x₁ x₂
       have h₂ := hBounds.upper x₁ x₂
       simp only [zero_div, neg_zero, zero_mul] at h₁ h₂
       exact le_antisymm h₂ h₁
-    have h := bregman_three_point E g (x₁ + (g x₁ - g x₂)) x₁ x₂
+    have h := bregman_three_point E (x₁ + (gradient E x₁ - gradient E x₂)) x₁ x₂
     simp only [hB, add_sub_cancel_left, real_inner_self_eq_norm_sq] at h
     simp only [zero_mul]
-    nlinarith [norm_nonneg (g x₁ - g x₂)]
+    nlinarith [norm_nonneg (gradient E x₁ - gradient E x₂)]
   · have h₁ := hBounds.interpolation_upper (by linarith) x₁ x₂
     have h₂ := hBounds.interpolation_upper (by linarith) x₂ x₁
-    rw [norm_sub_rev x₂ x₁, norm_sub_rev (g x₂) (g x₁)] at h₂
-    have hi : ⟪x₂ - x₁, g x₂ - g x₁⟫ = ⟪x₁ - x₂, g x₁ - g x₂⟫ := by
-      rw [← neg_sub x₁ x₂, ← neg_sub (g x₁) (g x₂), inner_neg_neg]
+    rw [norm_sub_rev x₂ x₁, norm_sub_rev (gradient E x₂) (gradient E x₁)] at h₂
+    have hi : ⟪x₂ - x₁, gradient E x₂ - gradient E x₁⟫ = ⟪x₁ - x₂, gradient E x₁ - gradient E x₂⟫ := by
+      rw [← neg_sub x₁ x₂, ← neg_sub (gradient E x₁) (gradient E x₂), inner_neg_neg]
     rw [hi] at h₂
     have hDen : 0 < 2 * (L + L) := by linarith
     have hm₁ := (le_div_iff₀ hDen).mp h₁
     have hm₂ := (le_div_iff₀ hDen).mp h₂
-    have hSum := bregman_add_reverse E g x₁ x₂
-    rw [real_inner_comm (x₁ - x₂) (g x₁ - g x₂)] at hSum
-    have hSq : ‖g x₁ - g x₂‖ ^ 2 ≤ L ^ 2 * ‖x₁ - x₂‖ ^ 2 := by nlinarith
-    nlinarith [norm_nonneg (g x₁ - g x₂), mul_nonneg hPos.le (norm_nonneg (x₁ - x₂))]
+    have hSum := bregman_add_reverse E x₁ x₂
+    rw [real_inner_comm (x₁ - x₂) (gradient E x₁ - gradient E x₂)] at hSum
+    have hSq : ‖gradient E x₁ - gradient E x₂‖ ^ 2 ≤ L ^ 2 * ‖x₁ - x₂‖ ^ 2 := by nlinarith
+    nlinarith [norm_nonneg (gradient E x₁ - gradient E x₂), mul_nonneg hPos.le (norm_nonneg (x₁ - x₂))]
+
+/-- Bregman bounds give the corresponding outer secant inequality. -/
+theorem HasBregmanBounds.outer_secant {E : H → ℝ} {LPlus LMinus : ℝ}
+    (hBounds : HasBregmanBounds LPlus LMinus E)
+    (hSum : 0 ≤ LPlus + LMinus) (x₁ x₂ : H) :
+    ⟪gradient E x₁ - gradient E x₂ + LMinus • (x₁ - x₂), gradient E x₁ - gradient E x₂ - LPlus • (x₁ - x₂)⟫ ≤ 0 := by
+  let c := (LPlus - LMinus) / 2
+  let r := (LPlus + LMinus) / 2
+  let F := fun x => E x - c / 2 * ‖x‖ ^ 2
+  let G := fun x => gradient E x - c • x
+  have hGradientF : gradient F = G := by
+    apply gradient_eq
+    intro x
+    rw [hasGradientAt_iff_hasFDerivAt]
+    convert (hBounds.hasGradientAt x).hasFDerivAt.sub
+      (hasGradientAt_quadratic c (0 : H) x).hasFDerivAt using 1
+    · ext y
+      simp [F]
+    · simp [G, InnerProductSpace.toDual]
+  have hShift (x₁ x₂ : H) :
+      bregman F x₁ x₂ = bregman E x₁ x₂ - c / 2 * ‖x₁ - x₂‖ ^ 2 := by
+    simp only [bregman, hGradientF, F, G, inner_sub_left, inner_sub_right, real_inner_smul_left,
+      real_inner_self_eq_norm_sq, norm_sub_sq_real]
+    rw [real_inner_comm x₂ x₁]
+    ring
+  have hCentered : HasBregmanBounds r r F := by
+    constructor
+    · intro x₁ x₂
+      rw [hShift]
+      have := hBounds.lower x₁ x₂
+      dsimp [r, c]
+      linarith
+    · intro x₁ x₂
+      rw [hShift]
+      have := hBounds.upper x₁ x₂
+      dsimp [r, c]
+      linarith
+  have hr : 0 ≤ r := by dsimp [r]; positivity
+  have hNorm := hCentered.norm_sub_le hr x₁ x₂
+  have hG : G x₁ - G x₂ = gradient E x₁ - gradient E x₂ - c • (x₁ - x₂) := by dsimp [G]; module
+  rw [hGradientF, hG] at hNorm
+  rw [← centered_secant_identity]
+  change ‖gradient E x₁ - gradient E x₂ - c • (x₁ - x₂)‖ ^ 2 - r ^ 2 * ‖x₁ - x₂‖ ^ 2 ≤ 0
+  nlinarith [norm_nonneg (gradient E x₁ - gradient E x₂ - c • (x₁ - x₂)), mul_nonneg hr (norm_nonneg (x₁ - x₂))]
+
+/-- Global quadratic Bregman bounds imply continuous differentiability. -/
+theorem HasBregmanBounds.contDiff
+    {E : H → ℝ} {LPlus LMinus : ℝ}
+    (hBounds : HasBregmanBounds LPlus LMinus E) :
+    ContDiff ℝ 1 E := by
+  let L := max |LPlus| |LMinus|
+  have hL : 0 ≤ L := (abs_nonneg LPlus).trans (le_max_left _ _)
+  have hPlus : LPlus ≤ L := (le_abs_self _).trans (le_max_left _ _)
+  have hMinus : LMinus ≤ L := (le_abs_self _).trans (le_max_right _ _)
+  have hLip : LipschitzWith ⟨L, hL⟩ (gradient E) :=
+    lipschitzWith_iff_norm_sub_le.mpr ((hBounds.mono hPlus hMinus).norm_sub_le hL)
+  refine contDiff_one_iff_fderiv.mpr ⟨fun x => (hBounds.hasGradientAt x).differentiableAt, ?_⟩
+  have hDeriv : fderiv ℝ E = fun x => (InnerProductSpace.toDual ℝ H) (gradient E x) :=
+    funext fun x => (hBounds.hasGradientAt x).hasFDerivAt.fderiv
+  rw [hDeriv]
+  exact (InnerProductSpace.toDual ℝ H).continuous.comp hLip.continuous
 
 namespace GradientMap
 
-variable [CompleteSpace H]
 variable {E : H → ℝ} {g : H → H} {L : ℝ}
 
-/-- Absolute inner-product secants give both quadratic remainder bounds. -/
+/-- Absolute inner-product secants give symmetric Bregman bounds. -/
 theorem hasBregmanBounds_of_abs_inner_le
     (hGrad : ∀ x, HasGradientAt E (g x) x)
     (hInner : ∀ x₁ x₂, |⟪g x₁ - g x₂, x₁ - x₂⟫| ≤ L * ‖x₁ - x₂‖ ^ 2) :
-    HasBregmanBounds E g L L := by
+    HasBregmanBounds L L E := by
   constructor
   · intro x₁ x₂
     have h := taylor_lower_bound_of_inner E g (-L) hGrad
       (fun x₁ x₂ => by have := (abs_le.mp (hInner x₁ x₂)).1; linarith) x₂ (x₁ - x₂)
     rw [show x₂ + (x₁ - x₂) = x₁ by abel] at h
-    dsimp [bregman]
+    simp only [bregman, gradient_eq hGrad]
     linarith
   · intro x₁ x₂
     have h := taylor_upper_bound_of_inner E g L hGrad
       (fun x₁ x₂ => (abs_le.mp (hInner x₁ x₂)).2) x₂ (x₁ - x₂)
-    simpa [bregman] using h
+    simpa [bregman, gradient_eq hGrad] using h
 
 /-- A gradient has the same constant in its norm and absolute inner-product secant bounds. -/
 theorem norm_sub_le_iff_abs_inner_le (hGrad : ∀ x, HasGradientAt E (g x) x) (hL : 0 ≤ L) :
@@ -86,7 +167,8 @@ theorem norm_sub_le_iff_abs_inner_le (hGrad : ∀ x, HasGradientAt E (g x) x) (h
       _ ≤ (L * ‖x₁ - x₂‖) * ‖x₁ - x₂‖ := mul_le_mul_of_nonneg_right (hLip x₁ x₂) (norm_nonneg _)
       _ = _ := by ring
   · intro hInner
-    exact (hasBregmanBounds_of_abs_inner_le hGrad hInner).norm_sub_le hL
+    simpa only [gradient_eq hGrad] using
+      (hasBregmanBounds_of_abs_inner_le hGrad hInner).norm_sub_le hL
 
 /-- The least Lipschitz bound is approached by absolute inner-product secants. -/
 theorem exists_optimal_lipschitz_bound

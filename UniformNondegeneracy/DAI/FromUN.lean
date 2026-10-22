@@ -24,22 +24,25 @@ variable {H : Type*} [NormedAddCommGroup H] [InnerProductSpace ℝ H] [CompleteS
 
 namespace IsUN
 
-variable {bounds : CurvatureBounds} {E : H → ℝ} {g : H → H} {Λ : Scales}
+variable {bounds : CurvatureBounds} {E : H → ℝ} {Λ : Scales}
 
-local notation "D" => bregman E g
+local notation "g" => gradient E
+
+local notation "D" => bregman E
 local notation "Λ₊" => Λ.plus
 local notation "Λ₋" => Λ.minus
 local notation "τ₊" => Λ.tauPlus
 local notation "τ₋" => Λ.tauMinus
 
-private theorem plus_envelope_at_step (hUN : IsUN bounds E g)
+private theorem plus_envelope_at_step (hUN : IsUN bounds E)
     (hStrict : StrictAdmissible bounds Λ) (x₁ x₂ : H) :
     1 / 2 * ‖descentStep (fun x => g x - g x₁) Λ x₂ - x₁‖ ^ 2 +
-      interiorEnvelope (UN.relativeEnergy E g x₁) (fun x => g x - g x₁) τ₊ (descentStep (fun x => g x - g x₁) Λ x₂) =
-      phiPlus E g Λ x₁ x₂ := by
+      envelope (UN.relativeEnergy E x₁) τ₊ (descentStep (fun x => g x - g x₁) Λ x₂) =
+      phiPlus E Λ x₁ x₂ := by
   have hs := hStrict.positive_parameter_mem
-  have he := (hUN.relativeEnergy x₁).interiorEnvelope_at_step hs x₂
-  change interiorEnvelope _ _ _ (x₂ - τ₊ • (g x₂ - g x₁)) = _ at he
+  have he := (hUN.relativeEnergy x₁).envelope_at_step hs x₂
+  rw [gradient_relativeEnergy hUN.differentiable] at he
+  change envelope _ _ (x₂ - τ₊ • (g x₂ - g x₁)) = _ at he
   unfold descentStep gradientStep
   rw [he, hUN.stationaryValue_relativeEnergy]
   unfold phiPlus UN.relativeEnergy bregman
@@ -50,14 +53,15 @@ private theorem plus_envelope_at_step (hUN : IsUN bounds E g)
     real_inner_comm x₁ (g x₂), real_inner_comm x₁ (g x₁)]
   ring
 
-private theorem minus_envelope_at_step (hUN : IsUN bounds E g)
+private theorem minus_envelope_at_step (hUN : IsUN bounds E)
     (hStrict : StrictAdmissible bounds Λ) (x₁ x₂ : H) :
     1 / 2 * ‖ascentStep (fun x => g x - g x₁) Λ x₂ - x₁‖ ^ 2 +
-      interiorEnvelope (UN.relativeEnergy E g x₁) (fun x => g x - g x₁) (-τ₋) (ascentStep (fun x => g x - g x₁) Λ x₂) =
-      phiMinus E g Λ x₁ x₂ := by
+      envelope (UN.relativeEnergy E x₁) (-τ₋) (ascentStep (fun x => g x - g x₁) Λ x₂) =
+      phiMinus E Λ x₁ x₂ := by
   have hs := hStrict.negative_parameter_mem
-  have he := (hUN.relativeEnergy x₁).interiorEnvelope_at_step hs x₂
-  change interiorEnvelope _ _ _ (x₂ - (-τ₋) • (g x₂ - g x₁)) = _ at he
+  have he := (hUN.relativeEnergy x₁).envelope_at_step hs x₂
+  rw [gradient_relativeEnergy hUN.differentiable] at he
+  change envelope _ _ (x₂ - (-τ₋) • (g x₂ - g x₁)) = _ at he
   unfold ascentStep gradientStep
   rw [he, hUN.stationaryValue_relativeEnergy]
   unfold phiMinus UN.relativeEnergy bregman
@@ -69,15 +73,13 @@ private theorem minus_envelope_at_step (hUN : IsUN bounds E g)
   ring
 
 /-- DAI from the envelope comparison at strict admissible scales. -/
-theorem hasDAI_of_strict (hUN : IsUN bounds E g)
-    (hStrict : StrictAdmissible bounds Λ) (ρ : Weights)
-    (hWeights : CompatibleWeights bounds Λ ρ) :
-    HasDAI E g Λ ρ := by
-  have hprod : 0 < ρ.plus * ρ.minus := hStrict.q_pos.trans_le hWeights.product_lower
-  have hp : 0 < ρ.plus := by nlinarith [ρ.plus_nonneg, ρ.minus_nonneg]
+theorem hasDAI_of_strict (hUN : IsUN bounds E)
+    (hStrict : StrictAdmissible bounds Λ)
+    (ρ : Weights) (hWeights : CompatibleWeights bounds Λ ρ) :
+    HasDAI Λ ρ E := by
+  refine ⟨hUN.contDiff, ?_⟩
   intro x y z
-  have h := (hUN.relativeEnergy x).envelope_pair_comparison_strict hStrict ρ hp
-    hWeights.plus_lower hWeights.minus_lower hWeights.product_lower
+  have h := (hUN.relativeEnergy x).envelope_pair_comparison_strict hStrict hWeights
     (descentStep (fun x' => g x' - g x) Λ y)
     (ascentStep (fun x' => g x' - g x) Λ z)
   rw [hUN.stationaryPoint_relativeEnergy,
@@ -89,10 +91,11 @@ theorem hasDAI_of_strict (hUN : IsUN bounds E g)
   rw [inner_neg_neg]
 
 /-- Extend DAI from strict to admissible scales by simultaneous inflation of both scales. -/
-private theorem hasDAI_by_inflation (hUN : IsUN bounds E g)
-    (hAdmissible : Admissible bounds Λ) (ρ : Weights)
-    (hWeights : CompatibleWeights bounds Λ ρ) :
-    HasDAI E g Λ ρ := by
+private theorem hasDAI_by_inflation (hUN : IsUN bounds E)
+    (hAdmissible : Admissible bounds Λ)
+    (ρ : Weights) (hWeights : CompatibleWeights bounds Λ ρ) :
+    HasDAI Λ ρ E := by
+  refine ⟨hUN.contDiff, ?_⟩
   let η : ℝ → ℝ := fun ε => Real.sqrt (2 * Λ.radius * ε + ε ^ 2)
   let ρPlus : ℝ → ℝ := fun ε => (Λ₋ * ρ.plus + η ε) / (Λ₋ + ε)
   let ρMinus : ℝ → ℝ := fun ε => (Λ₊ * ρ.minus + η ε) / (Λ₊ + ε)
@@ -154,7 +157,7 @@ private theorem hasDAI_by_inflation (hUN : IsUN bounds E g)
   have hle (ε : ℝ) (hε_pos : ε ∈ Set.Ioi (0 : ℝ)) : lhs ε ≤ rhs ε := by
     have hh := hUN.hasDAI_of_strict (hAdmissible.strict_inflate ε hε_pos)
       ⟨ρPlus ε, ρMinus ε, (hρPlus_pos ε hε_pos).le, (hρMinus_pos ε hε_pos).le⟩ (hcompat ε hε_pos)
-    exact hh x y z
+    exact hh.apply x y z
   have hLhs : ContinuousAt lhs 0 := by
     dsimp [lhs]
     fun_prop (disch := norm_num [Λ.plus_pos.ne', Λ.minus_pos.ne'])
@@ -167,17 +170,11 @@ private theorem hasDAI_by_inflation (hUN : IsUN bounds E g)
     descentStep, ascentStep, gradientStep, phiPlus, phiMinus,
     Scales.tauPlus, Scales.tauMinus, Λ.plus_pos.ne', Λ.minus_pos.ne'] using hlim
 
-theorem hasDAI_canonicalWeights (hUN : IsUN bounds E g)
-    (hAdmissible : Admissible bounds Λ) :
-    HasDAI E g Λ hAdmissible.canonicalWeights := by
-  exact hUN.hasDAI_by_inflation hAdmissible hAdmissible.canonicalWeights
-    hAdmissible.canonicalWeights_compatible
-
 /-- DAI at admissible scales with compatible weights. -/
-theorem hasDAI (hUN : IsUN bounds E g)
-    (hAdmissible : Admissible bounds Λ) (ρ : Weights)
-    (hWeights : CompatibleWeights bounds Λ ρ) :
-    HasDAI E g Λ ρ := by
+theorem hasDAI (hUN : IsUN bounds E)
+    (hAdmissible : Admissible bounds Λ)
+    (ρ : Weights) (hWeights : CompatibleWeights bounds Λ ρ) :
+    HasDAI Λ ρ E := by
   exact hUN.hasDAI_by_inflation hAdmissible ρ hWeights
 
 end IsUN

@@ -8,7 +8,7 @@ public import UniformNondegeneracy.DAI.Parameters
 /-!
 # Admissible scales, multipliers, and effective curvature bounds
 
-The maximal multiplier `q` satisfies $0 \le q < 1$ at admissible scales, giving the condition number $\kappa = \frac{1}{1-q}$. Effective curvature bounds center the inner gap at `Λ.center` and set the outer bounds to the selected scales.
+Admissible scales give $0 \le q < 1$ and determine the compatible DAI weights. Effective curvature bounds specialize the curvature geometry to these scales.
 -/
 
 namespace UN.DAI
@@ -35,17 +35,9 @@ structure StrictAdmissible (bounds : CurvatureBounds) (Λ : Scales) : Prop
 def q (bounds : CurvatureBounds) (Λ : Scales) : ℝ :=
   sSup (Λ.multiplier '' bounds.bands)
 
-/-- The DAI condition number. -/
-def kappa (bounds : CurvatureBounds) (Λ : Scales) : ℝ := 1 / (1 - q bounds Λ)
-
-/-- Denominator in the explicit formula for `kappa`. -/
-def kappaDenominator (bounds : CurvatureBounds) (Λ : Scales) : ℝ :=
-  min (bounds.muPlus * (bounds.muPlus - Λ.difference))
-    (bounds.muMinus * (bounds.muMinus + Λ.difference))
-
 /-- Signed distance from `Λ.center` to the boundary of the inner gap. -/
 def gapMargin (bounds : CurvatureBounds) (Λ : Scales) : ℝ :=
-  min (bounds.muPlus - Λ.center) (bounds.muMinus + Λ.center)
+  bounds.innerRadiusAt Λ.center
 
 def effectiveMuPlus (bounds : CurvatureBounds) (Λ : Scales) : ℝ :=
   gapMargin bounds Λ + Λ.center
@@ -55,26 +47,20 @@ def effectiveMuMinus (bounds : CurvatureBounds) (Λ : Scales) : ℝ :=
 
 /-- Symmetric outer radius after subtracting the quadratic with coefficient `Λ.center`. -/
 def centeredOuterRadius (bounds : CurvatureBounds) (Λ : Scales) : ℝ :=
-  max (bounds.lPlus - Λ.center) (bounds.lMinus + Λ.center)
-
-theorem one_sub_q_eq_inv_kappa (bounds : CurvatureBounds) (Λ : Scales) :
-    1 - q bounds Λ = 1 / kappa bounds Λ := by simp [kappa]
+  bounds.outerRadiusAt Λ.center
 
 theorem gapMargin_eq_innerRadius_sub_abs (bounds : CurvatureBounds) (Λ : Scales) :
-    gapMargin bounds Λ = bounds.innerRadius - |bounds.innerCenter - Λ.center| := by
-  unfold gapMargin CurvatureBounds.innerRadius CurvatureBounds.innerCenter
-  rcases le_total (bounds.muPlus - Λ.center) (bounds.muMinus + Λ.center) with h | h
-  · rw [min_eq_left h, abs_of_nonpos (by linarith)]; ring
-  · rw [min_eq_right h, abs_of_nonneg (by linarith)]; ring
+    gapMargin bounds Λ = bounds.innerRadius - |bounds.innerCenter - Λ.center| :=
+  bounds.innerRadiusAt_eq Λ.center
 
 theorem effectiveMuPlus_le_muPlus (bounds : CurvatureBounds) (Λ : Scales) :
     effectiveMuPlus bounds Λ ≤ bounds.muPlus := by
-  dsimp [effectiveMuPlus, gapMargin]
+  dsimp [effectiveMuPlus, gapMargin, CurvatureBounds.innerRadiusAt]
   linarith [min_le_left (bounds.muPlus - Λ.center) (bounds.muMinus + Λ.center)]
 
 theorem effectiveMuMinus_le_muMinus (bounds : CurvatureBounds) (Λ : Scales) :
     effectiveMuMinus bounds Λ ≤ bounds.muMinus := by
-  dsimp [effectiveMuMinus, gapMargin]
+  dsimp [effectiveMuMinus, gapMargin, CurvatureBounds.innerRadiusAt]
   linarith [min_le_right (bounds.muPlus - Λ.center) (bounds.muMinus + Λ.center)]
 
 theorem effective_widths_eq (bounds : CurvatureBounds) (Λ : Scales) :
@@ -88,19 +74,15 @@ theorem gapMargin_inflate (bounds : CurvatureBounds) (Λ : Scales)
   simp [gapMargin]
 
 theorem gapMargin_le_centeredOuterRadius (bounds : CurvatureBounds) (Λ : Scales) :
-    gapMargin bounds Λ ≤ centeredOuterRadius bounds Λ := by
-  exact (min_le_left _ _).trans ((sub_le_sub_right bounds.muPlus_le_lPlus _).trans
-    (le_max_left _ _))
+    gapMargin bounds Λ ≤ centeredOuterRadius bounds Λ :=
+  bounds.innerRadiusAt_le_outerRadiusAt Λ.center
 
 theorem centeredOuterRadius_eq (bounds : CurvatureBounds) (Λ : Scales) :
-    centeredOuterRadius bounds Λ = bounds.outerRadius + |bounds.outerCenter - Λ.center| := by
-  unfold centeredOuterRadius CurvatureBounds.outerRadius CurvatureBounds.outerCenter
-  rcases le_total (bounds.lPlus - Λ.center) (bounds.lMinus + Λ.center) with h | h
-  · rw [max_eq_right h, abs_of_nonpos (by linarith)]; ring
-  · rw [max_eq_left h, abs_of_nonneg (by linarith)]; ring
+    centeredOuterRadius bounds Λ = bounds.outerRadius + |bounds.outerCenter - Λ.center| :=
+  bounds.outerRadiusAt_eq Λ.center
 
 /-!
-## Multiplier and condition number
+## Multiplier bounds
 -/
 
 namespace OuterCompatible
@@ -132,7 +114,7 @@ theorem q_nonneg (hOuter : OuterCompatible bounds Λ) : 0 ≤ q bounds Λ := by
 
 theorem centeredOuterRadius_le_radius (hOuter : OuterCompatible bounds Λ) :
     centeredOuterRadius bounds Λ ≤ Λ.radius := by
-  unfold centeredOuterRadius Scales.radius Scales.center Scales.difference
+  unfold centeredOuterRadius CurvatureBounds.outerRadiusAt Scales.radius Scales.center Scales.difference
   apply max_le <;> linarith [hOuter.lPlus_le_plus, hOuter.lMinus_le_minus]
 
 end OuterCompatible
@@ -141,8 +123,8 @@ namespace Admissible
 
 variable {bounds : CurvatureBounds} {Λ : Scales}
 
-theorem kappaDenominator_pos (hAdmissible : Admissible bounds Λ) :
-    0 < kappaDenominator bounds Λ := by
+private theorem endpoint_product_pos (hAdmissible : Admissible bounds Λ) :
+    0 < min (bounds.muPlus * (bounds.muPlus - Λ.difference)) (bounds.muMinus * (bounds.muMinus + Λ.difference)) := by
   exact lt_min (mul_pos bounds.muPlus_pos (sub_pos.mpr hAdmissible.difference_lt_muPlus))
     (mul_pos bounds.muMinus_pos (by linarith [hAdmissible.neg_muMinus_lt_difference]))
 
@@ -184,10 +166,10 @@ theorem q_eq_max_inner_endpoints (hAdmissible : Admissible bounds Λ) :
       (le_csSup hb ⟨_, Or.inr ⟨le_rfl, bounds.muPlus_le_lPlus⟩, rfl⟩)
 
 theorem q_eq_one_sub_div (hAdmissible : Admissible bounds Λ) :
-    q bounds Λ = 1 - kappaDenominator bounds Λ / (Λ.plus * Λ.minus) := by
+    q bounds Λ =
+      1 - min (bounds.muPlus * (bounds.muPlus - Λ.difference)) (bounds.muMinus * (bounds.muMinus + Λ.difference)) / (Λ.plus * Λ.minus) := by
   rw [hAdmissible.q_eq_max_inner_endpoints, multiplier_formula, multiplier_formula]
   have hp : 0 < Λ.plus * Λ.minus := mul_pos Λ.plus_pos Λ.minus_pos
-  unfold kappaDenominator
   have hneg : -bounds.muMinus * (-bounds.muMinus - Λ.difference) =
       bounds.muMinus * (bounds.muMinus + Λ.difference) := by ring
   rw [hneg, ← min_div_div_right (le_of_lt hp)]
@@ -196,26 +178,8 @@ theorem q_eq_one_sub_div (hAdmissible : Admissible bounds Λ) :
 
 theorem q_lt_one (hAdmissible : Admissible bounds Λ) : q bounds Λ < 1 := by
   rw [hAdmissible.q_eq_one_sub_div]
-  exact sub_lt_self _ (div_pos hAdmissible.kappaDenominator_pos
+  exact sub_lt_self _ (div_pos (endpoint_product_pos hAdmissible)
     (mul_pos Λ.plus_pos Λ.minus_pos))
-
-theorem kappa_pos (hAdmissible : Admissible bounds Λ) : 0 < kappa bounds Λ := by
-  exact one_div_pos.mpr (sub_pos.mpr hAdmissible.q_lt_one)
-
-theorem one_le_kappa (hAdmissible : Admissible bounds Λ) : 1 ≤ kappa bounds Λ := by
-  exact (le_div_iff₀ (sub_pos.mpr hAdmissible.q_lt_one)).mpr (by
-    simpa using sub_le_self (1 : ℝ) hAdmissible.toOuterCompatible.q_nonneg)
-
-theorem kappa_eq_div (hAdmissible : Admissible bounds Λ) :
-    kappa bounds Λ = Λ.plus * Λ.minus / kappaDenominator bounds Λ := by
-  unfold kappa
-  rw [hAdmissible.q_eq_one_sub_div]
-  simp
-
-theorem kappa_sub_one (hAdmissible : Admissible bounds Λ) :
-    kappa bounds Λ - 1 = kappa bounds Λ * q bounds Λ := by
-  unfold kappa
-  field_simp [ne_of_gt (sub_pos.mpr hAdmissible.q_lt_one)]; ring
 
 /-!
 ## Effective curvature bounds
@@ -230,13 +194,12 @@ theorem center_mem_gap (hAdmissible : Admissible bounds Λ) :
     bounds.muMinus_pos, bounds.muPlus_pos]
 
 theorem gapMargin_pos (hAdmissible : Admissible bounds Λ) :
-    0 < gapMargin bounds Λ := by
-  exact lt_min (sub_pos.mpr hAdmissible.center_mem_gap.2)
-    (by linarith [hAdmissible.center_mem_gap.1])
+    0 < gapMargin bounds Λ :=
+  bounds.innerRadiusAt_pos hAdmissible.center_mem_gap.1 hAdmissible.center_mem_gap.2
 
 theorem abs_center_lt_gapMargin (hAdmissible : Admissible bounds Λ) :
     |Λ.center| < gapMargin bounds Λ := by
-  unfold gapMargin
+  unfold gapMargin CurvatureBounds.innerRadiusAt
   apply lt_min
   · rw [abs_lt]
     dsimp [Scales.center]
@@ -246,26 +209,8 @@ theorem abs_center_lt_gapMargin (hAdmissible : Admissible bounds Λ) :
     constructor <;> linarith [bounds.muMinus_pos, hAdmissible.neg_muMinus_lt_difference]
 
 theorem gapMargin_eq_infDist (hAdmissible : Admissible bounds Λ) :
-    gapMargin bounds Λ = Metric.infDist Λ.center bounds.bands := by
-  apply le_antisymm
-  · apply (Metric.le_infDist bounds.bands_nonempty).mpr
-    intro x hx
-    rw [Real.dist_eq]
-    rcases hx with hx | hx
-    · rw [abs_of_nonneg (by linarith [hx.2, hAdmissible.center_mem_gap.1])]
-      exact (min_le_right _ _).trans (by linarith [hx.2])
-    · rw [abs_of_nonpos (by linarith [hx.1, hAdmissible.center_mem_gap.2])]
-      exact (min_le_left _ _).trans (by linarith [hx.1])
-  · apply le_min
-    · have h := Metric.infDist_le_dist_of_mem
-        (s := bounds.bands) (x := Λ.center)
-        (y := bounds.muPlus) (Or.inr ⟨le_rfl, bounds.muPlus_le_lPlus⟩)
-      simpa [Real.dist_eq, abs_of_nonpos (sub_nonpos.mpr hAdmissible.center_mem_gap.2.le)] using h
-    · have h := Metric.infDist_le_dist_of_mem
-        (s := bounds.bands) (x := Λ.center)
-        (y := -bounds.muMinus) (Or.inl ⟨by linarith [bounds.muMinus_le_lMinus], le_rfl⟩)
-      rw [Real.dist_eq, abs_of_nonneg (by linarith [hAdmissible.center_mem_gap.1])] at h
-      simpa [add_comm] using h
+    gapMargin bounds Λ = Metric.infDist Λ.center bounds.bands :=
+  bounds.innerRadiusAt_eq_infDist hAdmissible.center_mem_gap.1 hAdmissible.center_mem_gap.2
 
 theorem effectiveMuPlus_pos (hAdmissible : Admissible bounds Λ) :
     0 < effectiveMuPlus bounds Λ := by
@@ -277,11 +222,12 @@ theorem effectiveMuMinus_pos (hAdmissible : Admissible bounds Λ) :
   exact sub_pos.mpr (abs_lt.mp hAdmissible.abs_center_lt_gapMargin).2
 
 theorem effectiveMuPlus_mul_effectiveMuMinus (hAdmissible : Admissible bounds Λ) :
-    effectiveMuPlus bounds Λ * effectiveMuMinus bounds Λ = kappaDenominator bounds Λ := by
+    effectiveMuPlus bounds Λ * effectiveMuMinus bounds Λ =
+      min (bounds.muPlus * (bounds.muPlus - Λ.difference)) (bounds.muMinus * (bounds.muMinus + Λ.difference)) := by
   have hp := sub_pos.mpr hAdmissible.center_mem_gap.2
   have hm : 0 < bounds.muMinus + Λ.center := by linarith [hAdmissible.center_mem_gap.1]
   have hc : 2 * Λ.center = Λ.difference := by unfold Scales.center; ring
-  unfold effectiveMuPlus effectiveMuMinus gapMargin kappaDenominator
+  unfold effectiveMuPlus effectiveMuMinus gapMargin CurvatureBounds.innerRadiusAt
   rcases le_total (bounds.muPlus - Λ.center) (bounds.muMinus + Λ.center) with h | h
   · rw [min_eq_left h, min_eq_left (by nlinarith)]
     rw [← hc]; ring
@@ -295,14 +241,6 @@ theorem q_eq_radius_gapMargin (hAdmissible : Admissible bounds Λ) :
   rw [hAdmissible.q_eq_one_sub_div]
   field_simp [ne_of_gt Λ.plus_pos, ne_of_gt Λ.minus_pos]
   nlinarith [Λ.radius_sq_sub_center_sq]
-
-theorem kappa_mul_steps_mul_effective_inner (hAdmissible : Admissible bounds Λ) :
-    kappa bounds Λ * Λ.tauPlus * Λ.tauMinus * effectiveMuPlus bounds Λ * effectiveMuMinus bounds Λ = 1 := by
-  rw [show kappa bounds Λ * Λ.tauPlus * Λ.tauMinus * effectiveMuPlus bounds Λ * effectiveMuMinus bounds Λ =
-      kappa bounds Λ * Λ.tauPlus * Λ.tauMinus * (effectiveMuPlus bounds Λ * effectiveMuMinus bounds Λ) by ring,
-    hAdmissible.effectiveMuPlus_mul_effectiveMuMinus, hAdmissible.kappa_eq_div]
-  unfold Scales.tauPlus Scales.tauMinus
-  field_simp [ne_of_gt Λ.plus_pos, ne_of_gt Λ.minus_pos, ne_of_gt hAdmissible.kappaDenominator_pos]
 
 /-- Curvature bounds with outer magnitudes `Λ.plus`, `Λ.minus` and effective inner magnitudes. -/
 def effectiveBounds (hAdmissible : Admissible bounds Λ) : CurvatureBounds where
@@ -334,10 +272,6 @@ theorem q_swap (hAdmissible : Admissible bounds Λ) :
   rw [max_comm]
   congr 1 <;> ring
 
-theorem kappa_swap (hAdmissible : Admissible bounds Λ) :
-    kappa bounds.swap Λ.swap = kappa bounds Λ := by
-  simp only [kappa, hAdmissible.q_swap]
-
 theorem inflate (hAdmissible : Admissible bounds Λ) (ε : ℝ) (hε : 0 ≤ ε) :
     Admissible bounds (Λ.inflate ε hε) := by
   refine ⟨⟨?_, ?_⟩, ?_, ?_⟩
@@ -352,27 +286,14 @@ theorem strict_inflate (hAdmissible : Admissible bounds Λ) (ε : ℝ) (hε : 0 
   · dsimp [Scales.inflate]; linarith [hAdmissible.lPlus_le_plus]
   · dsimp [Scales.inflate]; linarith [hAdmissible.lMinus_le_minus]
 
-theorem kappa_inflate (hAdmissible : Admissible bounds Λ) (ε : ℝ) (hε : 0 ≤ ε) :
-    kappa bounds (Λ.inflate ε hε) = (Λ.plus + ε) * (Λ.minus + ε) / kappaDenominator bounds Λ := by
-  rw [(hAdmissible.inflate ε hε).kappa_eq_div]
-  simp only [kappaDenominator, Scales.inflate_difference]
-  rfl
-
 theorem centeredOuterRadius_pos (hAdmissible : Admissible bounds Λ) :
     0 < centeredOuterRadius bounds Λ := by
   apply lt_of_lt_of_le _ (le_max_left _ _)
   linarith [hAdmissible.center_mem_gap.2, bounds.muPlus_le_lPlus]
 
 /-- Symmetric curvature bounds for the centered energy. -/
-def centeredBounds (hAdmissible : Admissible bounds Λ) : CurvatureBounds where
-  muPlus := gapMargin bounds Λ
-  muMinus := gapMargin bounds Λ
-  lPlus := centeredOuterRadius bounds Λ
-  lMinus := centeredOuterRadius bounds Λ
-  muPlus_pos := hAdmissible.gapMargin_pos
-  muMinus_pos := hAdmissible.gapMargin_pos
-  muPlus_le_lPlus := gapMargin_le_centeredOuterRadius bounds Λ
-  muMinus_le_lMinus := gapMargin_le_centeredOuterRadius bounds Λ
+def centeredBounds (hAdmissible : Admissible bounds Λ) : CurvatureBounds :=
+  bounds.centered Λ.center hAdmissible.center_mem_gap.1 hAdmissible.center_mem_gap.2
 
 end Admissible
 
@@ -391,7 +312,7 @@ theorem q_pos (hStrict : StrictAdmissible bounds Λ) : 0 < q bounds Λ := by
 
 theorem centeredOuterRadius_lt_radius (hStrict : StrictAdmissible bounds Λ) :
     centeredOuterRadius bounds Λ < Λ.radius := by
-  unfold centeredOuterRadius Scales.radius Scales.center Scales.difference
+  unfold centeredOuterRadius CurvatureBounds.outerRadiusAt Scales.radius Scales.center Scales.difference
   apply max_lt <;> linarith [hStrict.lPlus_lt_plus, hStrict.lMinus_lt_minus]
 
 theorem swap (hStrict : StrictAdmissible bounds Λ) :
@@ -421,7 +342,20 @@ def balancedScales (bounds : CurvatureBounds) : Scales where
   dsimp
   ring
 
-theorem balancedScales_admissible (bounds : CurvatureBounds) : Admissible bounds (balancedScales bounds) := by
+@[simp] theorem effectiveMuPlus_balancedScales (bounds : CurvatureBounds) :
+    effectiveMuPlus bounds (balancedScales bounds) = bounds.muPlus := by
+  dsimp [effectiveMuPlus, gapMargin, CurvatureBounds.innerRadiusAt, Scales.center]
+  rw [balancedScales_difference, min_eq_left (by linarith)]
+  ring
+
+@[simp] theorem effectiveMuMinus_balancedScales (bounds : CurvatureBounds) :
+    effectiveMuMinus bounds (balancedScales bounds) = bounds.muMinus := by
+  dsimp [effectiveMuMinus, gapMargin, CurvatureBounds.innerRadiusAt, Scales.center]
+  rw [balancedScales_difference, min_eq_left (by linarith)]
+  ring
+
+theorem balancedScales_admissible (bounds : CurvatureBounds) :
+    Admissible bounds (balancedScales bounds) := by
   refine ⟨⟨?_, ?_⟩, ?_, ?_⟩
   · change bounds.lPlus ≤ bounds.muPlus + bounds.maxBandWidth
     have h := le_max_left (bounds.lPlus - bounds.muPlus) (bounds.lMinus - bounds.muMinus)
@@ -435,7 +369,5 @@ theorem balancedScales_admissible (bounds : CurvatureBounds) : Admissible bounds
     linarith [bounds.muPlus_pos]
   · rw [balancedScales_difference]
     linarith [bounds.muMinus_pos]
-
-
 end
 end UN.DAI

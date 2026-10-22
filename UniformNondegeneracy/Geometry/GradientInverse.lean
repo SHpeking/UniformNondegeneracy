@@ -23,11 +23,11 @@ variable {H : Type*} [NormedAddCommGroup H] [InnerProductSpace ℝ H] [CompleteS
 -/
 
 /-- The finite difference of `E` in direction `v` with increment `h`. -/
-def directionalDifference (E : H → ℝ) (v : H) (h : ℝ) (x : H) : ℝ :=
+private def directionalDifference (E : H → ℝ) (v : H) (h : ℝ) (x : H) : ℝ :=
   (E (x + h • v) - E x) / h
 
 /-- The finite difference of `g` in direction `v` with increment `h`. -/
-def differenceGradient (g : H → H) (v : H) (h : ℝ) (x : H) : H :=
+private def differenceGradient (g : H → H) (v : H) (h : ℝ) (x : H) : H :=
   h⁻¹ • (g (x + h • v) - g x)
 
 /-- A normalized ascent step for the field `V`. -/
@@ -46,11 +46,10 @@ private def residualFactor (μ L : ℝ) : ℝ :=
 ## Directional finite differences
 -/
 
-theorem hasGradientAt_directionalDifference
+private theorem hasGradientAt_directionalDifference
     (E : H → ℝ) (g : H → H)
     (hGrad : ∀ x, HasGradientAt E (g x) x)
-    (v : H) (h : ℝ)
-    (x : H) :
+    (v : H) (h : ℝ) (x : H) :
     HasGradientAt (directionalDifference E v h) (differenceGradient g v h x) x := by
   rw [hasGradientAt_iff_hasFDerivAt]
   have ht := (hGrad (x + h • v)).hasFDerivAt.comp x ((hasFDerivAt_id x).add_const (h • v))
@@ -62,7 +61,7 @@ theorem hasGradientAt_directionalDifference
 
 omit [CompleteSpace H] in
 /-- Two-sided bounds on the finite-difference gradient in a unit direction. -/
-theorem differenceGradient_norm_bounds
+private theorem differenceGradient_norm_bounds
     (g : H → H) (μ L : ℝ)
     (hLower : ∀ x₁ x₂, μ * ‖x₁ - x₂‖ ≤ ‖g x₁ - g x₂‖)
     (hUpper : ∀ x₁ x₂, ‖g x₁ - g x₂‖ ≤ L * ‖x₁ - x₂‖)
@@ -80,7 +79,7 @@ theorem differenceGradient_norm_bounds
 
 omit [CompleteSpace H] in
 /-- The difference gradient is globally Lipschitz with bound `2L / h`. -/
-theorem differenceGradient_norm_sub_le
+private theorem differenceGradient_norm_sub_le
     (g : H → H) (L : ℝ)
     (hUpper : ∀ x₁ x₂, ‖g x₁ - g x₂‖ ≤ L * ‖x₁ - x₂‖)
     (v : H) (h : ℝ) (hIncrement : 0 < h)
@@ -99,7 +98,7 @@ theorem differenceGradient_norm_sub_le
     _ = _ := by ring
 
 /-- The finite difference approximates the directional gradient component. -/
-theorem abs_directionalDifference_sub_inner_le
+private theorem abs_directionalDifference_sub_inner_le
     (E : H → ℝ) (g : H → H) (L : ℝ)
     (hGrad : ∀ x, HasGradientAt E (g x) x)
     (hUpper : ∀ x₁ x₂, ‖g x₁ - g x₂‖ ≤ L * ‖x₁ - x₂‖)
@@ -231,11 +230,8 @@ theorem exists_directional_improvement
 ## Residual contraction and surjectivity
 -/
 
-private theorem residualFactor_nonneg_lt_one
-    (μ L : ℝ)
-    (hμ_pos : 0 < μ) (hμ_le_L : μ ≤ L) :
-    0 ≤ residualFactor μ L ∧
-    residualFactor μ L < 1 := by
+private theorem residualFactor_nonneg_lt_one (μ L : ℝ) (hμ_pos : 0 < μ) (hμ_le_L : μ ≤ L) :
+    0 ≤ residualFactor μ L ∧ residualFactor μ L < 1 := by
   have hL_pos : 0 < L := lt_of_lt_of_le hμ_pos hμ_le_L
   have hr₀_pos : μ ^ 2 ≤ L ^ 2 := sq_le_sq₀ hμ_pos.le hL_pos.le |>.mpr hμ_le_L
   have hden : 0 < 2 * L ^ 2 := by positivity
@@ -319,13 +315,19 @@ private theorem exists_residual_sequence
       _ = _ := by ring
 
 /-- A gradient with two-sided Lipschitz bounds is surjective. -/
-theorem surjective_of_bounds
+theorem surjective_of_bilipschitz
     (E : H → ℝ) (g : H → H) (μ L : ℝ)
     (hGrad : ∀ x, HasGradientAt E (g x) x)
-    (hμ_pos : 0 < μ) (hμ_le_L : μ ≤ L)
+    (hμ_pos : 0 < μ)
     (hLower : ∀ x₁ x₂, μ * ‖x₁ - x₂‖ ≤ ‖g x₁ - g x₂‖)
     (hUpper : ∀ x₁ x₂, ‖g x₁ - g x₂‖ ≤ L * ‖x₁ - x₂‖) :
     Function.Surjective g := by
+  rcases subsingleton_or_nontrivial H with hH | hH
+  · exact fun p => ⟨p, hH.elim _ _⟩
+  let _ := hH
+  obtain ⟨x, hx⟩ := exists_ne (0 : H)
+  have hNorm : 0 < ‖x - 0‖ := norm_pos_iff.mpr (sub_ne_zero.mpr hx)
+  have hμ_le_L : μ ≤ L := (mul_le_mul_iff_left₀ hNorm).mp ((hLower x 0).trans (hUpper x 0))
   have hL : 0 < L := lt_of_lt_of_le hμ_pos hμ_le_L
   have hLip : LipschitzWith ⟨L, hL.le⟩ g := lipschitzWith_iff_norm_sub_le.mpr hUpper
   have hAnti : AntilipschitzWith ⟨μ⁻¹, inv_nonneg.mpr hμ_pos.le⟩ g := by
@@ -362,22 +364,20 @@ theorem injective_of_lower_bound
   have : ‖x₁ - x₂‖ = 0 := by nlinarith [norm_nonneg (x₁ - x₂)]
   exact sub_eq_zero.mp (norm_eq_zero.mp this)
 
-theorem bijective_of_bounds
+theorem bijective_of_bilipschitz
     (E : H → ℝ) (g : H → H) (μ L : ℝ)
     (hGrad : ∀ x, HasGradientAt E (g x) x)
-    (hμ_pos : 0 < μ) (hμ_le_L : μ ≤ L)
+    (hμ_pos : 0 < μ)
     (hLower : ∀ x₁ x₂, μ * ‖x₁ - x₂‖ ≤ ‖g x₁ - g x₂‖)
     (hUpper : ∀ x₁ x₂, ‖g x₁ - g x₂‖ ≤ L * ‖x₁ - x₂‖) :
     Function.Bijective g := by
   exact ⟨injective_of_lower_bound g μ hμ_pos hLower,
-    surjective_of_bounds E g μ L hGrad
-      hμ_pos hμ_le_L hLower hUpper⟩
+    surjective_of_bilipschitz E g μ L hGrad hμ_pos hLower hUpper⟩
 
 omit [InnerProductSpace ℝ H] [CompleteSpace H] in
 /-- A right inverse inherits the reciprocal norm bound. -/
 theorem inverse_norm_sub_le
-    (g gInv : H → H) (μ : ℝ)
-    (hμ_pos : 0 < μ)
+    (g gInv : H → H) (μ : ℝ) (hμ_pos : 0 < μ)
     (hLower : ∀ x₁ x₂, μ * ‖x₁ - x₂‖ ≤ ‖g x₁ - g x₂‖)
     (hRightInverse : Function.RightInverse gInv g)
     (p₁ p₂ : H) :

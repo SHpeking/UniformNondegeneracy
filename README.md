@@ -8,13 +8,13 @@ Uniform nondegeneracy provides a unifying framework for studying the geometry of
 
 Let $\mathcal{H}$ be a real Hilbert space with inner product $\langle\cdot,\cdot\rangle$ and norm $\|\cdot\|$, and let $E\in C^1(\mathcal{H};\mathbb{R})$ have gradient $g=\nabla E:\mathcal{H}\to\mathcal{H}$.
 
-**Definition.** $E$ is [uniformly nondegenerate (UN)](UniformNondegeneracy/Core/Basic.lean) with curvature bound $\mathcal{S}=[-L_-,-\mu_-]\cup[\mu_+,L_+]$, where $L_-\ge\mu_->0$ and $L_+\ge\mu_+>0$, if, for every $x_1,x_2\in\mathcal{H}$, the differences $\Delta x=x_1-x_2$ and $\Delta g=g(x_1)-g(x_2)$ satisfy
+**Definition.** $E$ is [uniformly nondegenerate (UN)](UniformNondegeneracy/Core/Basic.lean) with curvature bands $\mathcal{S}=[-L_-,-\mu_-]\cup[\mu_+,L_+]$, where $L_-\ge\mu_->0$ and $L_+\ge\mu_+>0$, if, for every $x_1,x_2\in\mathcal{H}$, the differences $\Delta x=x_1-x_2$ and $\Delta g=g(x_1)-g(x_2)$ satisfy
 
 $$
 \langle\Delta g+L_-\Delta x,\Delta g-L_+\Delta x\rangle\le0\le\langle\Delta g+\mu_-\Delta x,\Delta g-\mu_+\Delta x\rangle.
 $$
 
-In particular, for $E\in C^2(\mathcal{H};\mathbb{R})$, this is equivalent to $\mathrm{spec}(\nabla^2 E(x))\subseteq\mathcal{S}$ for every $x\in\mathcal{H}$.
+In particular, for $E\in C^2(\mathcal{H};\mathbb{R})$, UN is [equivalent to the spectral condition](UniformNondegeneracy/Geometry/Spectral.lean) $\mathrm{spec}(\nabla^2 E(x))\subseteq\mathcal{S}$ for every $x\in\mathcal{H}$.
 
 ## Structural theory
 
@@ -38,7 +38,7 @@ $$
 E^\sharp(p)=\langle p,g^{-1}(p)\rangle-E(g^{-1}(p)),\quad p\in\mathcal{H},
 $$
 
-is UN with reciprocal curvature bound $\mathcal{S}^\sharp=[-\mu_-^{-1},-L_-^{-1}]\cup[L_+^{-1},\mu_+^{-1}]$, and satisfies
+is UN with reciprocal curvature bands $\mathcal{S}^\sharp=[-\mu_-^{-1},-L_-^{-1}]\cup[L_+^{-1},\mu_+^{-1}]$, and satisfies
 
 $$
 \nabla E^\sharp=(\nabla E)^{-1},\quad E^{\sharp\sharp}=E.
@@ -80,11 +80,11 @@ $$
 \rho_+\Phi_+(x,y)+\rho_-\Phi_-(x,z)\ge\langle\nabla_x\Phi_+(x,y),\nabla_x\Phi_-(x,z)\rangle,\quad \forall x,y,z\in\mathcal{H}.
 $$
 
-UN energies satisfy DAIs for suitable scales and weights. Conversely, under the balance condition $\frac{\rho_+}{\Lambda_+}=\frac{\rho_-}{\Lambda_-}$, [DAI yields two-sided secant bounds](UniformNondegeneracy/DAI/Secant.lean), and [two DAIs with suitable scales and weights](UniformNondegeneracy/DAI/ToUN.lean) recover UN.
+UN energies satisfy DAIs for suitable scales and weights. Conversely, [DAIs yield two-sided secant bounds](UniformNondegeneracy/DAI/Secant.lean), which in turn [imply UN](UniformNondegeneracy/DAI/ToUN.lean).
 
 ## Alternating descent–ascent
 
-UN energies admit a surprisingly simple algorithm: **alternating descent–ascent (ADA)**, which alternates full-gradient descent and ascent and converges globally to the unique stationary point $x^\star$ at a linear rate. Starting from any $x_0\in\mathcal{H}$ and either initial phase, ADA iterates as
+UN energies admit a surprisingly simple algorithm: **alternating descent–ascent (ADA)**, which alternates full-gradient descent and ascent and [converges globally to the unique stationary point $x^\star$ at a linear rate](UniformNondegeneracy/Algorithms/ADA/Complexity.lean). Starting from any $x_0\in\mathcal{H}$ and either initial phase, ADA iterates as
 
 ```
 if next_step == "descent":
@@ -101,7 +101,7 @@ $$
 1-\frac{1}{\kappa}=\max_{\lambda\in\mathcal{S}}\left(1-\frac{\lambda}{\Lambda_+}\right)\left(1+\frac{\lambda}{\Lambda_-}\right).
 $$
 
-Then, for every $T\in\mathbb{N}$, the ADA iteration satisfies the [linear convergence bound](UniformNondegeneracy/Algorithms/ADA/Complexity.lean)
+Then, for every $T\in\mathbb{N}$, the ADA iteration satisfies the linear convergence bound
 
 $$
 \min_{0\le t\le T}\|g(x_t)\|\lesssim\|g(x_0)\|\cdot\exp(-\Theta(T/\kappa)).
@@ -112,12 +112,12 @@ $$
 | Area | Responsibility |
 | --- | --- |
 | [Core](UniformNondegeneracy/Core) | Curvature bounds and the definition of UN |
-| [Analysis](UniformNondegeneracy/Analysis) | General Taylor and Bregman estimates, gradient-step bounds, and residual decay |
-| [Geometry](UniformNondegeneracy/Geometry) | Global gradient inversion, unique stationary points, transformations, duality, signed PL bounds, and refined secant inequalities |
+| [Analysis](UniformNondegeneracy/Analysis) | Spectral bounds, global inversion, Taylor and Bregman estimates, strong convexity, gradient-step bounds, and residual decay |
+| [Geometry](UniformNondegeneracy/Geometry) | Spectral characterization, global gradient inversion, stationary points, curvature reparameterization, transformations, limits, duality, signed PL bounds, and refined secant inequalities |
 | [Envelopes](UniformNondegeneracy/Envelopes) | Resolvents, two-sided envelopes, derivatives, and comparison inequalities |
-| [DAI](UniformNondegeneracy/DAI) | Descent–ascent inequalities, their derivation from UN, and the converse secant bounds |
-| [Algorithms/ADA](UniformNondegeneracy/Algorithms/ADA) | ADA iterations and explicit complexity bounds for the best-iterate gradient residual |
-| [Examples](UniformNondegeneracy/Examples) | Scalar and diagonal quadratics, and strongly convex energies with Lipschitz gradients |
+| [DAI](UniformNondegeneracy/DAI) | Descent–ascent inequalities, their transformations, Hessian spectral bounds, secant bounds, and relations with UN |
+| [Algorithms/ADA](UniformNondegeneracy/Algorithms/ADA) | ADA iterations, Lyapunov analysis, parameter selection, convergence, and complexity bounds |
+| [Examples](UniformNondegeneracy/Examples) | Scalar and diagonal quadratics, radially varying quadratic forms, [logarithmically rotating quadratics](UniformNondegeneracy/Examples/RotatingQuadratic.lean), strongly convex energies with Lipschitz gradients, and their [linearly constrained Lagrangians](UniformNondegeneracy/Examples/LinearConstraints.lean) |
 
 ## Building and imports
 

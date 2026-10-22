@@ -41,16 +41,14 @@ theorem prefixMin_le_at (r : ℕ → ℝ) {t T : ℕ} (hIndex : t ≤ T) :
     · exact min_le_right _ _
     · exact (min_le_left _ _).trans (ih (Nat.le_of_lt_succ h))
 
-theorem le_prefixMin (r : ℕ → ℝ) (T : ℕ) {a : ℝ}
-    (hLower : ∀ t ≤ T, a ≤ r t) :
+theorem le_prefixMin (r : ℕ → ℝ) (T : ℕ) {a : ℝ} (hLower : ∀ t ≤ T, a ≤ r t) :
     a ≤ prefixMin r T := by
   induction T with
   | zero => exact hLower 0 (by omega)
   | succ T ih =>
     exact le_min (ih (fun t hi => hLower t (Nat.le_succ_of_le hi))) (hLower _ le_rfl)
 
-theorem prefixMin_nonneg (r : ℕ → ℝ)
-    (hResidual : ∀ t, 0 ≤ r t) (T : ℕ) :
+theorem prefixMin_nonneg (r : ℕ → ℝ) (hResidual : ∀ t, 0 ≤ r t) (T : ℕ) :
     0 ≤ prefixMin r T := by
   exact le_prefixMin r T (fun t _ => hResidual t)
 
@@ -60,8 +58,7 @@ theorem prefixMin_antitone (r : ℕ → ℝ) :
   intro T
   exact min_le_left _ _
 
-theorem prefixMin_mono_seq {r₁ r₂ : ℕ → ℝ}
-    (hCompare : ∀ t, r₁ t ≤ r₂ t) (T : ℕ) :
+theorem prefixMin_mono_seq {r₁ r₂ : ℕ → ℝ} (hCompare : ∀ t, r₁ t ≤ r₂ t) (T : ℕ) :
     prefixMin r₁ T ≤ prefixMin r₂ T := by
   induction T with
   | zero => exact hCompare 0

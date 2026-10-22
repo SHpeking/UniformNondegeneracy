@@ -2,6 +2,7 @@ module
 
 public import UniformNondegeneracy.Analysis.PrefixMin
 public import Mathlib.Analysis.SpecialFunctions.Log.Basic
+public import Mathlib.Analysis.Real.Sqrt
 
 @[expose] public section
 
@@ -10,7 +11,7 @@ open scoped BigOperators
 /-!
 # Scalar residual decay from a Lyapunov certificate
 
-A Lyapunov decrease bound and comparison with squared residuals give exponential decay of the minimum residual.
+A Lyapunov decrease bound and comparison with squared residuals control later residuals and give exponential decay of the minimum residual.
 -/
 
 noncomputable section
@@ -38,6 +39,18 @@ theorem potential_antitone (hLyapunov : HasLyapunovBounds C r P) :
   apply antitone_nat_of_succ_le
   intro t
   linarith [hLyapunov.sufficient_decrease t, sq_nonneg (r t)]
+
+/-- Any earlier residual controls all later residuals through the potential comparison. -/
+theorem residual_le_of_le (hLyapunov : HasLyapunovBounds C r P) {t₀ t : ℕ} (ht : t₀ ≤ t) :
+    r t ≤ Real.sqrt C * r t₀ := by
+  have hC : 0 ≤ C := zero_le_one.trans hLyapunov.one_le_comparison
+  have hSq : (r t) ^ 2 ≤ C * (r t₀) ^ 2 :=
+    (hLyapunov.residual_sq_le_potential t).trans
+      ((hLyapunov.potential_antitone ht).trans (hLyapunov.potential_le_residual_sq t₀))
+  have hRoot : (Real.sqrt C * r t₀) ^ 2 = C * (r t₀) ^ 2 := by
+    rw [mul_pow, Real.sq_sqrt hC]
+  nlinarith only [hSq, hRoot, hLyapunov.residual_nonneg t,
+    mul_nonneg (Real.sqrt_nonneg C) (hLyapunov.residual_nonneg t₀)]
 
 theorem tail (hLyapunov : HasLyapunovBounds C r P) (t₀ : ℕ) :
     HasLyapunovBounds C (fun t => r (t₀ + t)) (fun t => P (t₀ + t)) := by

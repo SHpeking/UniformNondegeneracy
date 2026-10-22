@@ -1,6 +1,11 @@
 module
 
-public import Mathlib
+public import Mathlib.Analysis.Calculus.Gradient.Basic
+public import Mathlib.Analysis.Calculus.Deriv.MeanValue
+public import Mathlib.Analysis.InnerProductSpace.Calculus
+public import Mathlib.Tactic.FieldSimp
+public import Mathlib.Tactic.Linarith
+public import Mathlib.Tactic.Module
 
 @[expose] public section
 
@@ -14,6 +19,12 @@ namespace UN
 
 variable {H : Type*} [NormedAddCommGroup H] [InnerProductSpace ℝ H] [CompleteSpace H]
 
+/-- The gradient of a twice continuously differentiable energy is continuously differentiable. -/
+theorem contDiff_gradient {E : H → ℝ} (hE : ContDiff ℝ 2 E) :
+    ContDiff ℝ 1 (gradient E) := by
+  have hDeriv : ContDiff ℝ 1 (fderiv ℝ E) := (contDiff_succ_iff_fderiv.mp hE).2.2
+  exact (InnerProductSpace.toDual ℝ H).symm.toContinuousLinearEquiv.contDiff.comp hDeriv
+
 /-- The gradient of a translated scalar quadratic. -/
 theorem hasGradientAt_quadratic (c : ℝ) (x₂ x₁ : H) :
     HasGradientAt (fun x : H => c / 2 * ‖x - x₂‖ ^ 2) (c • (x₁ - x₂)) x₁ := by
@@ -21,6 +32,26 @@ theorem hasGradientAt_quadratic (c : ℝ) (x₂ x₁ : H) :
   have h := (((hasFDerivAt_id x₁).sub_const x₂).norm_sq.const_mul (c / 2))
   convert h using 1 <;> ext v <;> simp [InnerProductSpace.toDual]
   ring
+
+/-- Two-sided quadratic approximation at a point identifies its gradient. -/
+theorem hasGradientAt_of_quadratic_bounds {E : H → ℝ} {x v : H} {LPlus LMinus : ℝ}
+    (hLower : ∀ y, -(LMinus / 2) * ‖y - x‖ ^ 2 ≤ E y - E x - ⟪v, y - x⟫)
+    (hUpper : ∀ y, E y - E x - ⟪v, y - x⟫ ≤ LPlus / 2 * ‖y - x‖ ^ 2) :
+    HasGradientAt E v x := by
+  apply hasGradientAt_iff_isLittleO.mpr
+  have hO : (fun y => E y - E x - ⟪v, y - x⟫) =O[nhds x] (fun y => ‖y - x‖ ^ 2) := by
+    apply Asymptotics.isBigO_of_le' (c := max |LPlus| |LMinus| / 2) (nhds x)
+    intro y
+    simp only [Real.norm_eq_abs, abs_of_nonneg (sq_nonneg ‖y - x‖)]
+    apply abs_le.mpr
+    constructor
+    · have h := hLower y
+      have hm : LMinus ≤ max |LPlus| |LMinus| := (le_abs_self _).trans (le_max_right _ _)
+      nlinarith [mul_nonneg (sub_nonneg.mpr hm) (sq_nonneg ‖y - x‖)]
+    · have h := hUpper y
+      have hm : LPlus ≤ max |LPlus| |LMinus| := (le_abs_self _).trans (le_max_left _ _)
+      nlinarith [mul_nonneg (sub_nonneg.mpr hm) (sq_nonneg ‖y - x‖)]
+  exact hO.trans_isLittleO (Asymptotics.isLittleO_pow_sub_sub x (by norm_num : 1 < 2))
 
 omit [CompleteSpace H] in
 /-- A nonnegative function with a global quadratic upper model controls the norm of its linear coefficient. -/

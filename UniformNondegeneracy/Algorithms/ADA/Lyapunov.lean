@@ -1,7 +1,8 @@
 module
 
 public import UniformNondegeneracy.DAI.Basic
-public import UniformNondegeneracy.DAI.Weights
+public import UniformNondegeneracy.Algorithms.ADA.Weights
+public import UniformNondegeneracy.Algorithms.ADA.ConditionNumber
 public import UniformNondegeneracy.Algorithms.ADA.Iteration
 public import UniformNondegeneracy.Analysis.ResidualDecay
 
@@ -21,30 +22,27 @@ namespace UN.ADA
 
 open DAI
 
-variable {H : Type*} [NormedAddCommGroup H] [InnerProductSpace ℝ H]
+variable {H : Type*} [NormedAddCommGroup H] [InnerProductSpace ℝ H] [CompleteSpace H]
 
-/-- Bregman and DAI bounds, together with signed PL bounds relative to `Eref`. -/
-structure LyapunovInputs (bounds : CurvatureBounds) (E : H → ℝ) (g : H → H)
-    (Λ : Scales) (hAdmissible : Admissible bounds Λ)
-    (Eref : ℝ) : Prop where
-  bregman_bounds : HasBregmanBounds E g Λ.plus Λ.minus
-  signed_pl_lower : ∀ x, -(‖g x‖ ^ 2 / (2 * effectiveMuMinus bounds Λ)) ≤ E x - Eref
-  signed_pl_upper : ∀ x, E x - Eref ≤ ‖g x‖ ^ 2 / (2 * effectiveMuPlus bounds Λ)
-  dai : HasDAI E g Λ hAdmissible.canonicalWeights
+/-- Admissible scales and Bregman, signed PL, and DAI bounds relative to `Eref`. -/
+structure LyapunovAssumptions (bounds : CurvatureBounds) (Λ : Scales) (E : H → ℝ) (Eref : ℝ) : Prop where
+  admissible : Admissible bounds Λ
+  bregman_bounds : HasBregmanBounds Λ.plus Λ.minus E
+  signed_pl_lower : ∀ x, -(‖gradient E x‖ ^ 2 / (2 * effectiveMuMinus bounds Λ)) ≤ E x - Eref
+  signed_pl_upper : ∀ x, E x - Eref ≤ ‖gradient E x‖ ^ 2 / (2 * effectiveMuPlus bounds Λ)
+  dai : HasDAI Λ (lyapunovWeights admissible) E
 
 /-- The corrected energy $W(y)$ combines the energy gap, descent Bregman difference, and squared ascent displacement. -/
-def correctedEnergy (E : H → ℝ) (g : H → H) (Λ : Scales)
-    (κ Eref : ℝ) (y : H) : ℝ :=
-  let z := descentStep g Λ y
-  let yNext := ascentStep g Λ z
+def correctedEnergy (E : H → ℝ) (Λ : Scales) (κ Eref : ℝ) (y : H) : ℝ :=
+  let z := descentStep (gradient E) Λ y
+  let yNext := ascentStep (gradient E) Λ z
   Λ.tauPlus * (E y - Eref) +
-    (Λ.tauMinus / Λ.tauPlus) * (κ - 1) * phiPlus E g Λ z y +
+    (Λ.tauMinus / Λ.tauPlus) * (κ - 1) * phiPlus E Λ z y +
     ‖yNext - z‖ ^ 2 / 2
 
 /-- The normalized potential $P(y) = 2W(y)/\tau_{+}^{2}$. -/
-def normalizedEnergy (E : H → ℝ) (g : H → H) (Λ : Scales)
-    (κ Eref : ℝ) (y : H) : ℝ :=
-  2 * correctedEnergy E g Λ κ Eref y / Λ.tauPlus ^ 2
+def lyapunov (E : H → ℝ) (Λ : Scales) (κ Eref : ℝ) (y : H) : ℝ :=
+  2 * correctedEnergy E Λ κ Eref y / Λ.tauPlus ^ 2
 
 /-!
 ## Scalar comparison estimates
@@ -134,10 +132,11 @@ private theorem upper_scalar_bound (e_y G_y G_z Φ : ℝ)
 
 end ScalarEstimates
 
-namespace LyapunovInputs
+namespace LyapunovAssumptions
 
-variable {bounds : CurvatureBounds} {E : H → ℝ} {g : H → H} {Λ : Scales}
-variable {hAdmissible : Admissible bounds Λ} {Eref : ℝ}
+variable {bounds : CurvatureBounds} {Λ : Scales} {E : H → ℝ} {Eref : ℝ}
+
+local notation "g" => gradient E
 
 local notation "Λ₊" => Λ.plus
 local notation "Λ₋" => Λ.minus
@@ -146,20 +145,20 @@ local notation "τ₋" => Λ.tauMinus
 local notation "μEff₊" => effectiveMuPlus bounds Λ
 local notation "μEff₋" => effectiveMuMinus bounds Λ
 local notation "κ" => kappa bounds Λ
-local notation "Φ₊" => phiPlus E g Λ
-local notation "Φ₋" => phiMinus E g Λ
-local notation "P" => normalizedEnergy E g Λ κ Eref
+local notation "Φ₊" => phiPlus E Λ
+local notation "Φ₋" => phiMinus E Λ
+local notation "P" => lyapunov E Λ κ Eref
 
 /-!
 ## Comparison with the squared gradient norm
 -/
 
-private theorem phi_descent_gradient (hInputs : LyapunovInputs bounds E g Λ hAdmissible Eref)
+private theorem phi_descent_gradient (hAssumptions : LyapunovAssumptions bounds Λ E Eref)
     (x : H) :
     τ₊ ^ 2 * ‖g (descentStep g Λ x)‖ ^ 2 ≤ 2 * (1 + τ₊ / τ₋) * Φ₊ (descentStep g Λ x) x := by
   have hp := Λ.plus_pos
   have hm := Λ.minus_pos
-  have h := hInputs.bregman_bounds.descentStep_norm_sq_le (descentStep g Λ x) x
+  have h := hAssumptions.bregman_bounds.descentStep_norm_sq_le (descentStep g Λ x) x
   have hid : descentStep g Λ (descentStep g Λ x) - descentStep g Λ x = -τ₊ • g (descentStep g Λ x) := by
     unfold descentStep gradientStep
     module
@@ -182,13 +181,13 @@ private theorem corrected_energy_identity (x : H) :
   ring
 
 /-- The squared gradient norm is a lower bound for the normalized corrected energy. -/
-theorem residual_sq_le_normalizedEnergy
-    (hInputs : LyapunovInputs bounds E g Λ hAdmissible Eref) (x : H) :
+theorem lyapunov_lower_bound
+    (hAssumptions : LyapunovAssumptions bounds Λ E Eref) (x : H) :
     ‖g x‖ ^ 2 ≤ P x := by
   have ha := Λ.tauPlus_pos
   have hb := Λ.tauMinus_pos
-  have hm := hAdmissible.effectiveMuPlus_pos
-  have hn := hAdmissible.effectiveMuMinus_pos
+  have hm := hAssumptions.admissible.effectiveMuPlus_pos
+  have hn := hAssumptions.admissible.effectiveMuMinus_pos
   have hp := Λ.plus_pos
   have hmn := Λ.minus_pos
   have hw : τ₋ - τ₊ = τ₊ * τ₋ * (μEff₊ - μEff₋) := by
@@ -200,11 +199,11 @@ theorem residual_sq_le_normalizedEnergy
     (E x - Eref) (E (descentStep g Λ x) - Eref)
     (‖g x‖ ^ 2) (‖g (descentStep g Λ x)‖ ^ 2)
     (Φ₊ (descentStep g Λ x) x)
-    ha hb hn hAdmissible.one_le_kappa hAdmissible.kappa_mul_steps_mul_effective_inner hw
+    ha hb hn (one_le_kappa hAssumptions.admissible) (kappa_mul_steps_mul_effective_inner hAssumptions.admissible) hw
     (sq_nonneg _) (corrected_energy_identity x)
-    (by simpa only [neg_div] using hInputs.signed_pl_lower (descentStep g Λ x))
-    (hInputs.phi_descent_gradient x)
-  dsimp only [normalizedEnergy, correctedEnergy]
+    (by simpa only [neg_div] using hAssumptions.signed_pl_lower (descentStep g Λ x))
+    (hAssumptions.phi_descent_gradient x)
+  dsimp only [lyapunov, correctedEnergy]
   apply (le_div_iff₀ (sq_pos_of_pos ha)).mpr
   have hv : ascentStep g Λ (descentStep g Λ x) - descentStep g Λ x = τ₋ • g (descentStep g Λ x) := by
     unfold ascentStep gradientStep
@@ -214,22 +213,22 @@ theorem residual_sq_le_normalizedEnergy
   nlinarith only [h]
 
 /-- The normalized corrected energy is at most `3 * κ + 2` times the squared gradient norm. -/
-theorem normalizedEnergy_le_residual_sq
-    (hInputs : LyapunovInputs bounds E g Λ hAdmissible Eref)
+theorem lyapunov_upper_bound
+    (hAssumptions : LyapunovAssumptions bounds Λ E Eref)
     (hOrder : τ₋ ≤ τ₊) (x : H) :
     P x ≤ (3 * κ + 2) * ‖g x‖ ^ 2 := by
   have ha := Λ.tauPlus_pos
   have hb := Λ.tauMinus_pos
-  have hm := hAdmissible.effectiveMuPlus_pos
-  have hn := hAdmissible.effectiveMuMinus_pos
+  have hm := hAssumptions.admissible.effectiveMuPlus_pos
+  have hn := hAssumptions.admissible.effectiveMuMinus_pos
   have hp := Λ.plus_pos
   have hmn := Λ.minus_pos
   have hbn : τ₋ * μEff₋ ≤ 1 := by
     dsimp [Scales.tauMinus]
     rw [one_div_mul_eq_div]
-    exact (div_le_one hmn).mpr hAdmissible.effectiveBounds.muMinus_le_lMinus
+    exact (div_le_one hmn).mpr hAssumptions.admissible.effectiveBounds.muMinus_le_lMinus
   have hFu : 2 * τ₋ * Φ₊ (descentStep g Λ x) x ≤ (τ₊ + τ₋) * τ₊ ^ 2 * ‖g x‖ ^ 2 := by
-    have h := hInputs.bregman_bounds.lower (descentStep g Λ x) x
+    have h := hAssumptions.bregman_bounds.lower (descentStep g Λ x) x
     have hv : descentStep g Λ x - x = -τ₊ • g x := by
       unfold descentStep gradientStep
       module
@@ -245,15 +244,15 @@ theorem normalizedEnergy_le_residual_sq
     rw [heq] at h1
     nlinarith only [h1]
   have hFl : τ₊ ^ 2 * τ₋ * ‖g (descentStep g Λ x)‖ ^ 2 ≤ 2 * (τ₊ + τ₋) * Φ₊ (descentStep g Λ x) x := by
-    have h := mul_le_mul_of_nonneg_left (hInputs.phi_descent_gradient x) hb.le
+    have h := mul_le_mul_of_nonneg_left (hAssumptions.phi_descent_gradient x) hb.le
     field_simp at h
     nlinarith only [h]
   have h := upper_scalar_bound τ₊ τ₋ κ μEff₊ μEff₋
     (E x - Eref) (‖g x‖ ^ 2) (‖g (descentStep g Λ x)‖ ^ 2)
     (Φ₊ (descentStep g Λ x) x)
-    ha hb hm hAdmissible.one_le_kappa hAdmissible.kappa_mul_steps_mul_effective_inner hbn hOrder
-    (sq_nonneg _) (hInputs.signed_pl_upper x) hFu hFl
-  dsimp only [normalizedEnergy, correctedEnergy]
+    ha hb hm (one_le_kappa hAssumptions.admissible) (kappa_mul_steps_mul_effective_inner hAssumptions.admissible) hbn hOrder
+    (sq_nonneg _) (hAssumptions.signed_pl_upper x) hFu hFl
+  dsimp only [lyapunov, correctedEnergy]
   apply (div_le_iff₀ (sq_pos_of_pos ha)).mpr
   have hv : ascentStep g Λ (descentStep g Λ x) - descentStep g Λ x = τ₋ • g (descentStep g Λ x) := by
     unfold ascentStep gradientStep
@@ -266,23 +265,9 @@ theorem normalizedEnergy_le_residual_sq
 ## Decrease over a descent–ascent cycle
 -/
 
-private theorem decrease_phiPlus_symm (x₁ x₂ : H) :
-    Φ₊ x₁ x₂ + Φ₊ x₂ x₁ = ⟪descentStep g Λ x₁ - descentStep g Λ x₂, x₁ - x₂⟫ := by
-  unfold phiPlus bregman descentStep gradientStep
-  simp only [norm_sub_sq_real, inner_sub_left, inner_sub_right,
-    real_inner_smul_left, real_inner_self_eq_norm_sq, real_inner_comm x₂ x₁]
-  ring
-
-private theorem decrease_phiMinus_symm (x₁ x₂ : H) :
-    Φ₋ x₁ x₂ + Φ₋ x₂ x₁ = ⟪ascentStep g Λ x₁ - ascentStep g Λ x₂, x₁ - x₂⟫ := by
-  unfold phiMinus bregman ascentStep gradientStep
-  simp only [norm_sub_sq_real, inner_sub_left, inner_sub_right,
-    real_inner_smul_left, real_inner_self_eq_norm_sq, real_inner_comm x₂ x₁]
-  ring
-
 /-- One descent–ascent cycle decreases the normalized corrected energy by at least the starting squared gradient norm. -/
-theorem normalizedEnergy_decrease
-    (hInputs : LyapunovInputs bounds E g Λ hAdmissible Eref)
+theorem lyapunov_decrease
+    (hAssumptions : LyapunovAssumptions bounds Λ E Eref)
     (hOrder : τ₋ ≤ τ₊) (y : H) :
     ‖g y‖ ^ 2 ≤ P y - P (descentAscentCycle g Λ y) := by
   let τPlus := τ₊
@@ -321,8 +306,8 @@ theorem normalizedEnergy_decrease
     rw [hA yNext]
     change -(τMinus / τPlus) • (zNext - yNext) = _
     module
-  have hDAI₁ := hInputs.dai z y yNext
-  have hDAI₂ := hInputs.dai yNext zNext z
+  have hDAI₁ := hAssumptions.dai.apply z y yNext
+  have hDAI₂ := hAssumptions.dai.apply yNext zNext z
   rw [hd1, ha1] at hDAI₁
   rw [hd2, ha2] at hDAI₂
   simp only [real_inner_smul_left, real_inner_smul_right, neg_mul, mul_neg, neg_neg] at hDAI₁ hDAI₂
@@ -333,14 +318,14 @@ theorem normalizedEnergy_decrease
   change ⟪yNext - zNext, yNextNext - zNext⟫ ≤
     q bounds Λ * τMinus / τPlus * Φ₊ yNext zNext + (τPlus / τMinus) * Φ₋ yNext z at hDAI₂
   have hM : (τPlus / τMinus) * (Φ₋ z yNext + Φ₋ yNext z) = ⟪yNext - zNext, yNext - z⟫ := by
-    rw [decrease_phiMinus_symm, ha1]
+    rw [phiMinus_add_reverse, ha1]
     simp only [real_inner_smul_left]
     rw [show z - yNext = -(yNext - z) by module, inner_neg_right]
     calc
       _ = (τPlus / τMinus * (τMinus / τPlus)) * ⟪yNext - zNext, yNext - z⟫ := by ring
       _ = _ := by rw [hmul, one_mul]
   have hP : (τMinus / τPlus) * (Φ₊ zNext yNext + Φ₊ yNext zNext) = ⟪yNext - zNext, yNextNext - zNext⟫ := by
-    rw [decrease_phiPlus_symm]
+    rw [phiPlus_add_reverse]
     rw [show descentStep g Λ zNext - descentStep g Λ yNext =
       -(descentStep g Λ yNext - descentStep g Λ zNext) by module, hd2]
     simp only [inner_neg_left, real_inner_smul_left]
@@ -353,9 +338,9 @@ theorem normalizedEnergy_decrease
     rw [mul_add] at hM
     rw [mul_div_assoc] at hDAI₁ hDAI₂
     nlinarith only [hDAI₁, hDAI₂, hM]
-  have hK := hAdmissible.kappa_pos
+  have hK := kappa_pos hAssumptions.admissible
   have hKq : κ * q bounds Λ = κ - 1 := by
-    have hq : 1 - q bounds Λ ≠ 0 := by linarith [hAdmissible.q_lt_one]
+    have hq : 1 - q bounds Λ ≠ 0 := by linarith [hAssumptions.admissible.q_lt_one]
     unfold kappa
     field_simp [hq]; ring
   have hscaled := mul_le_mul_of_nonneg_left hsum hK.le
@@ -371,8 +356,8 @@ theorem normalizedEnergy_decrease
   have hratio : Λ₋ / Λ₊ = τPlus / τMinus := by
     dsimp [τPlus, τMinus, Scales.tauPlus, Scales.tauMinus]
     field_simp
-  have hn1 := hInputs.bregman_bounds.descentStep_norm_sq_le yNext zNext
-  have hn2 := hInputs.bregman_bounds.descentStep_norm_sq_le zNext yNext
+  have hn1 := hAssumptions.bregman_bounds.descentStep_norm_sq_le yNext zNext
+  have hn2 := hAssumptions.bregman_bounds.descentStep_norm_sq_le zNext yNext
   rw [hd2, norm_smul, Real.norm_eq_abs, mul_pow, sq_abs, hratio] at hn1
   rw [norm_sub_rev, hd2, norm_smul, Real.norm_eq_abs, mul_pow, sq_abs, hratio] at hn2
   have hn : 2 * (τPlus / τMinus) ^ 2 * ‖yNextNext - zNext‖ ^ 2 ≤
@@ -390,12 +375,12 @@ theorem normalizedEnergy_decrease
   have hnonneg : 0 ≤ ⟪yNext - zNext, yNextNext - zNext⟫ := by
     rw [← hP]
     exact mul_nonneg (div_nonneg hτMinus_pos.le hτPlus_pos.le)
-      (add_nonneg (hInputs.bregman_bounds.phiPlus_nonneg zNext yNext)
-        (hInputs.bregman_bounds.phiPlus_nonneg yNext zNext))
+      (add_nonneg (hAssumptions.bregman_bounds.phiPlus_nonneg zNext yNext)
+        (hAssumptions.bregman_bounds.phiPlus_nonneg yNext zNext))
   have ht : τMinus / τPlus ≤ 1 := (div_le_one hτPlus_pos).mpr hab
   have hhalf : ‖yNextNext - zNext‖ ^ 2 / 2 ≤ ⟪yNext - zNext, yNextNext - zNext⟫ := by
     nlinarith only [hnscaled, mul_nonneg (show 0 ≤ 1 - τMinus / τPlus by linarith) hnonneg]
-  have hupper := mul_le_mul_of_nonneg_left (hInputs.bregman_bounds.upper yNext y) hτPlus_pos.le
+  have hupper := mul_le_mul_of_nonneg_left (hAssumptions.bregman_bounds.upper yNext y) hτPlus_pos.le
   have hconst : τPlus * (Λ₊ / 2 * ‖yNext - y‖ ^ 2) = ‖yNext - y‖ ^ 2 / 2 := by
     dsimp [τPlus, Scales.tauPlus]
     field_simp [Λ.plus_pos.ne']
@@ -418,24 +403,24 @@ theorem normalizedEnergy_decrease
 
 /-- The normalized corrected energy satisfies the Lyapunov bounds along ADA cycles. -/
 theorem hasLyapunovBounds
-    (hInputs : LyapunovInputs bounds E g Λ hAdmissible Eref)
+    (hAssumptions : LyapunovAssumptions bounds Λ E Eref)
     (hOrder : τ₋ ≤ τ₊) (x₀ : H) :
     HasLyapunovBounds (3 * κ + 2)
       (fun t => ‖g (cycleStart g Λ x₀ t)‖)
       (fun t => P (cycleStart g Λ x₀ t)) := by
   refine
-    { one_le_comparison := by linarith [hAdmissible.one_le_kappa]
+    { one_le_comparison := by linarith [one_le_kappa hAssumptions.admissible]
       residual_nonneg := fun t => norm_nonneg _
       residual_sq_le_potential := ?_
       potential_le_residual_sq := ?_
       sufficient_decrease := ?_ }
   · intro t
-    exact hInputs.residual_sq_le_normalizedEnergy _
+    exact hAssumptions.lyapunov_lower_bound _
   · intro t
-    exact hInputs.normalizedEnergy_le_residual_sq hOrder _
+    exact hAssumptions.lyapunov_upper_bound hOrder _
   · intro t
     simpa only [cycleStart] using
-      hInputs.normalizedEnergy_decrease hOrder (cycleStart g Λ x₀ t)
+      hAssumptions.lyapunov_decrease hOrder (cycleStart g Λ x₀ t)
 
-end LyapunovInputs
+end LyapunovAssumptions
 end UN.ADA

@@ -91,8 +91,7 @@ theorem trajectory_tail (g : H → H) (Λ : Scales)
     rw [trajectory_succ, ih, hphase, ← Nat.add_assoc, trajectory_succ]
 
 theorem trajectory_of_gradient_eq_zero (g : H → H) (Λ : Scales)
-    (firstPhase : Phase) (x₀ : H) (hStationary : g x₀ = 0)
-    (t : ℕ) :
+    (firstPhase : Phase) (x₀ : H) (hStationary : g x₀ = 0) (t : ℕ) :
     trajectory g Λ firstPhase x₀ t = x₀ := by
   induction t with
   | zero => rfl

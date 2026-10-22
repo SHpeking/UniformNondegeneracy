@@ -25,31 +25,33 @@ variable {H : Type*} [NormedAddCommGroup H] [InnerProductSpace ℝ H] [CompleteS
 -/
 
 /-- A chosen inverse of the gradient map. -/
-def inverseGradient (g : H → H) : H → H :=
-  Function.invFun g
+def inverseGradient (E : H → ℝ) : H → H :=
+  Function.invFun (gradient E)
 
 /-- The stationary point, obtained by inverting the zero vector. -/
-def stationaryPoint (g : H → H) : H :=
-  inverseGradient g 0
+def stationaryPoint (E : H → ℝ) : H :=
+  inverseGradient E 0
 
 /-- The stationary energy value. -/
-def stationaryValue (E : H → ℝ) (g : H → H) : ℝ :=
-  E (stationaryPoint g)
+def stationaryValue (E : H → ℝ) : ℝ :=
+  E (stationaryPoint E)
 
-variable {bounds : CurvatureBounds} {E : H → ℝ} {g : H → H}
+variable {bounds : CurvatureBounds} {E : H → ℝ}
+
+local notation "g" => gradient E
 
 local notation "L₊" => bounds.lPlus
 local notation "L₋" => bounds.lMinus
-local notation "D" => bregman E g
-local notation "xStar" => stationaryPoint g
-local notation "EStar" => stationaryValue E g
+local notation "D" => bregman E
+local notation "xStar" => stationaryPoint E
+local notation "EStar" => stationaryValue E
 
 /-!
 ## Centered forms of the secant inequalities
 -/
 
 /-- Centered norm form of the inner secant inequality. -/
-theorem IsUN.inner_centered (hUN : IsUN bounds E g) (x₁ x₂ : H) :
+theorem IsUN.inner_centered (hUN : IsUN bounds E) (x₁ x₂ : H) :
     bounds.innerRadius * ‖x₁ - x₂‖ ≤ ‖g x₁ - g x₂ - bounds.innerCenter • (x₁ - x₂)‖ := by
   have hs := hUN.inner_secant x₁ x₂
   rw [← centered_secant_identity] at hs
@@ -57,7 +59,7 @@ theorem IsUN.inner_centered (hUN : IsUN bounds E g) (x₁ x₂ : H) :
   nlinarith [norm_nonneg (g x₁ - g x₂ - bounds.innerCenter • (x₁ - x₂))]
 
 /-- Centered norm form of the outer secant inequality. -/
-theorem IsUN.outer_centered (hUN : IsUN bounds E g) (x₁ x₂ : H) :
+theorem IsUN.outer_centered (hUN : IsUN bounds E) (x₁ x₂ : H) :
     ‖g x₁ - g x₂ - bounds.outerCenter • (x₁ - x₂)‖ ≤ bounds.outerRadius * ‖x₁ - x₂‖ := by
   have hs := hUN.outer_secant x₁ x₂
   rw [← centered_secant_identity] at hs
@@ -69,7 +71,7 @@ theorem IsUN.outer_centered (hUN : IsUN bounds E g) (x₁ x₂ : H) :
   nlinarith
 
 /-- Squared inner centered secant inequality. -/
-theorem IsUN.inner_centered_sq (hUN : IsUN bounds E g) (x₁ x₂ : H) :
+theorem IsUN.inner_centered_sq (hUN : IsUN bounds E) (x₁ x₂ : H) :
     bounds.innerRadius ^ 2 * ‖x₁ - x₂‖ ^ 2 ≤ ‖g x₁ - g x₂ - bounds.innerCenter • (x₁ - x₂)‖ ^ 2 := by
   have h := hUN.inner_centered x₁ x₂
   have hr : 0 ≤ bounds.innerRadius := by
@@ -79,14 +81,14 @@ theorem IsUN.inner_centered_sq (hUN : IsUN bounds E g) (x₁ x₂ : H) :
   nlinarith
 
 /-- Squared outer centered secant inequality. -/
-theorem IsUN.outer_centered_sq (hUN : IsUN bounds E g) (x₁ x₂ : H) :
+theorem IsUN.outer_centered_sq (hUN : IsUN bounds E) (x₁ x₂ : H) :
     ‖g x₁ - g x₂ - bounds.outerCenter • (x₁ - x₂)‖ ^ 2 ≤ bounds.outerRadius ^ 2 * ‖x₁ - x₂‖ ^ 2 := by
   have h := hUN.outer_centered x₁ x₂
   have hn := norm_nonneg (g x₁ - g x₂ - bounds.outerCenter • (x₁ - x₂))
   nlinarith
 
 /-- The inner secant gives the global lower norm bound, with `muMin = min muPlus muMinus`. -/
-theorem IsUN.lower_norm_sub_le (hUN : IsUN bounds E g) (x₁ x₂ : H) :
+theorem IsUN.gradient_lower_bound (hUN : IsUN bounds E) (x₁ x₂ : H) :
     bounds.muMin * ‖x₁ - x₂‖ ≤ ‖g x₁ - g x₂‖ := by
   have h := hUN.inner_centered x₁ x₂
   have ht := norm_sub_le (g x₁ - g x₂) (bounds.innerCenter • (x₁ - x₂))
@@ -95,16 +97,12 @@ theorem IsUN.lower_norm_sub_le (hUN : IsUN bounds E g) (x₁ x₂ : H) :
   nlinarith
 
 /-- The outer secant gives the global Lipschitz norm bound, with `lMax = max lPlus lMinus`. -/
-theorem IsUN.norm_sub_le_upper (hUN : IsUN bounds E g) (x₁ x₂ : H) :
-    ‖g x₁ - g x₂‖ ≤ bounds.lMax * ‖x₁ - x₂‖ := by
-  have h := hUN.outer_centered x₁ x₂
-  have ht := norm_add_le (g x₁ - g x₂ - bounds.outerCenter • (x₁ - x₂)) (bounds.outerCenter • (x₁ - x₂))
-  rw [sub_add_cancel, norm_smul, Real.norm_eq_abs] at ht
-  rw [← bounds.outerRadius_add_abs_outerCenter]
-  nlinarith
+theorem IsUN.gradient_upper_bound (hUN : IsUN bounds E) (x₁ x₂ : H) :
+    ‖g x₁ - g x₂‖ ≤ bounds.lMax * ‖x₁ - x₂‖ :=
+  norm_le_of_outer_secant _ _ bounds.lPlus_pos.le bounds.lMinus_pos.le (hUN.outer_secant x₁ x₂)
 
 /-- The asymmetric outer curvatures bound the directional secant. -/
-theorem IsUN.outer_inner_bounds (hUN : IsUN bounds E g) (x₁ x₂ : H) :
+theorem IsUN.directional_secant_bounds (hUN : IsUN bounds E) (x₁ x₂ : H) :
     -L₋ * ‖x₁ - x₂‖ ^ 2 ≤ ⟪g x₁ - g x₂, x₁ - x₂⟫ ∧
     ⟪g x₁ - g x₂, x₁ - x₂⟫ ≤ L₊ * ‖x₁ - x₂‖ ^ 2 := by
   have h := hUN.outer_centered x₁ x₂
@@ -119,86 +117,90 @@ theorem IsUN.outer_inner_bounds (hUN : IsUN bounds E g) (x₁ x₂ : H) :
 ## Global invertibility
 -/
 
-theorem IsUN.gradient_continuous (hUN : IsUN bounds E g) :
-    Continuous g := by
-  have hLip : LipschitzWith ⟨bounds.lMax, le_of_lt bounds.lMax_pos⟩ g := by
-    apply LipschitzWith.of_dist_le_mul
-    intro x₁ x₂
-    simp only [dist_eq_norm]
-    exact_mod_cast hUN.norm_sub_le_upper x₁ x₂
-  exact hLip.continuous
+theorem IsUN.gradient_lipschitz (hUN : IsUN bounds E) :
+    LipschitzWith ⟨bounds.lMax, bounds.lMax_pos.le⟩ g :=
+  lipschitzWith_iff_norm_sub_le.mpr hUN.gradient_upper_bound
 
-theorem IsUN.gradient_injective (hUN : IsUN bounds E g) :
-    Function.Injective g := by
-  apply GradientMap.injective_of_lower_bound g bounds.muMin
-  · exact bounds.muMin_pos
-  · exact hUN.lower_norm_sub_le
+theorem IsUN.gradient_antilipschitz (hUN : IsUN bounds E) :
+    AntilipschitzWith ⟨bounds.muMin⁻¹, inv_nonneg.mpr bounds.muMin_pos.le⟩ g := by
+  apply antilipschitzWith_iff_le_mul_dist.mpr
+  intro x₁ x₂
+  simp only [dist_eq_norm]
+  change ‖x₁ - x₂‖ ≤ bounds.muMin⁻¹ * ‖g x₁ - g x₂‖
+  rw [inv_mul_eq_div, le_div_iff₀ bounds.muMin_pos]
+  simpa only [mul_comm] using hUN.gradient_lower_bound x₁ x₂
 
-theorem IsUN.gradient_surjective (hUN : IsUN bounds E g) :
+theorem IsUN.gradient_continuous (hUN : IsUN bounds E) :
+    Continuous g :=
+  hUN.gradient_lipschitz.continuous
+
+theorem IsUN.gradient_injective (hUN : IsUN bounds E) :
+    Function.Injective g :=
+  hUN.gradient_antilipschitz.injective
+
+theorem IsUN.gradient_surjective (hUN : IsUN bounds E) :
     Function.Surjective g := by
-  apply GradientMap.surjective_of_bounds E g bounds.muMin bounds.lMax
-  · exact hUN.has_gradient
+  apply GradientMap.surjective_of_bilipschitz E g bounds.muMin bounds.lMax
+  · exact hUN.hasGradientAt
   · exact bounds.muMin_pos
-  · exact bounds.muMin_le_lMax
-  · exact hUN.lower_norm_sub_le
-  · exact hUN.norm_sub_le_upper
+  · exact hUN.gradient_lower_bound
+  · exact hUN.gradient_upper_bound
 
-theorem IsUN.gradient_bijective (hUN : IsUN bounds E g) :
+theorem IsUN.gradient_bijective (hUN : IsUN bounds E) :
     Function.Bijective g := by
   exact ⟨hUN.gradient_injective, hUN.gradient_surjective⟩
 
-theorem IsUN.gradient_inverseGradient (hUN : IsUN bounds E g) (p : H) :
-    g (inverseGradient g p) = p := by
+theorem IsUN.gradient_inverseGradient (hUN : IsUN bounds E) (p : H) :
+    g (inverseGradient E p) = p := by
   exact Function.rightInverse_invFun hUN.gradient_surjective p
 
-theorem IsUN.inverseGradient_gradient (hUN : IsUN bounds E g) (x : H) :
-    inverseGradient g (g x) = x := by
+theorem IsUN.inverseGradient_gradient (hUN : IsUN bounds E) (x : H) :
+    inverseGradient E (g x) = x := by
   exact Function.leftInverse_invFun hUN.gradient_injective x
 
 /-- The inverse has norm Lipschitz bound `1 / muMin`. -/
-theorem IsUN.inverse_norm_sub_le (hUN : IsUN bounds E g) (p₁ p₂ : H) :
-    ‖inverseGradient g p₁ - inverseGradient g p₂‖ ≤ bounds.muMin⁻¹ * ‖p₁ - p₂‖ := by
-  apply GradientMap.inverse_norm_sub_le g (inverseGradient g) bounds.muMin
+theorem IsUN.inverseGradient_bound (hUN : IsUN bounds E) (p₁ p₂ : H) :
+    ‖inverseGradient E p₁ - inverseGradient E p₂‖ ≤ bounds.muMin⁻¹ * ‖p₁ - p₂‖ := by
+  apply GradientMap.inverse_norm_sub_le g (inverseGradient E) bounds.muMin
   · exact bounds.muMin_pos
-  · exact hUN.lower_norm_sub_le
+  · exact hUN.gradient_lower_bound
   · exact hUN.gradient_inverseGradient
 
-theorem IsUN.inverseGradient_continuous (hUN : IsUN bounds E g) :
-    Continuous (inverseGradient g) := by
-  have hLip : LipschitzWith ⟨bounds.muMin⁻¹, inv_nonneg.mpr (le_of_lt bounds.muMin_pos)⟩ (inverseGradient g) := by
-    apply LipschitzWith.of_dist_le_mul
-    intro x₁ x₂
-    simp only [dist_eq_norm]
-    exact_mod_cast hUN.inverse_norm_sub_le x₁ x₂
-  exact hLip.continuous
+theorem IsUN.inverseGradient_lipschitz (hUN : IsUN bounds E) :
+    LipschitzWith ⟨bounds.muMin⁻¹, inv_nonneg.mpr bounds.muMin_pos.le⟩ (inverseGradient E) :=
+  lipschitzWith_iff_norm_sub_le.mpr hUN.inverseGradient_bound
+
+theorem IsUN.inverseGradient_continuous (hUN : IsUN bounds E) :
+    Continuous (inverseGradient E) :=
+  hUN.inverseGradient_lipschitz.continuous
 
 /-- The gradient as a homeomorphism of `H`. -/
-def IsUN.gradientHomeomorph (hUN : IsUN bounds E g) : H ≃ₜ H where
+def IsUN.gradientHomeomorph (hUN : IsUN bounds E) : H ≃ₜ H where
   toEquiv :=
     { toFun := g
-      invFun := inverseGradient g
+      invFun := inverseGradient E
       left_inv := hUN.inverseGradient_gradient
       right_inv := hUN.gradient_inverseGradient }
   continuous_toFun := hUN.gradient_continuous
   continuous_invFun := hUN.inverseGradient_continuous
 
-theorem IsUN.gradientHomeomorph_apply (hUN : IsUN bounds E g) (x : H) :
+theorem IsUN.gradientHomeomorph_apply (hUN : IsUN bounds E) (x : H) :
     hUN.gradientHomeomorph x = g x := by
   rfl
 
-theorem IsUN.gradientHomeomorph_symm_apply (hUN : IsUN bounds E g) (p : H) :
-    hUN.gradientHomeomorph.symm p = inverseGradient g p := by
+theorem IsUN.gradientHomeomorph_symm_apply (hUN : IsUN bounds E) (p : H) :
+    hUN.gradientHomeomorph.symm p = inverseGradient E p := by
   rfl
 
 /-!
 ## The unique stationary point
 -/
 
-theorem IsUN.gradient_stationaryPoint (hUN : IsUN bounds E g) :
+theorem IsUN.gradient_stationaryPoint (hUN : IsUN bounds E) :
     g xStar = 0 := by
   exact hUN.gradient_inverseGradient 0
 
-theorem IsUN.gradient_eq_zero_iff (hUN : IsUN bounds E g) (x : H) :
+theorem IsUN.gradient_eq_zero_iff (hUN : IsUN bounds E) (x : H) :
     g x = 0 ↔ x = xStar := by
   constructor
   · intro h
@@ -207,7 +209,7 @@ theorem IsUN.gradient_eq_zero_iff (hUN : IsUN bounds E g) (x : H) :
     exact hUN.gradient_stationaryPoint
 
 /-- Existence and uniqueness of a zero of the gradient. -/
-theorem IsUN.unique_stationaryPoint (hUN : IsUN bounds E g) :
+theorem IsUN.unique_stationaryPoint (hUN : IsUN bounds E) :
     ∃! x, g x = 0 := by
   exact ⟨xStar, hUN.gradient_stationaryPoint,
     fun x h => (hUN.gradient_eq_zero_iff x).mp h⟩
@@ -216,31 +218,31 @@ theorem IsUN.unique_stationaryPoint (hUN : IsUN bounds E g) :
 ## Basic Bregman identities and one-sided bounds
 -/
 
-theorem IsUN.bregman_stationaryPoint (hUN : IsUN bounds E g) (x : H) :
+theorem IsUN.bregman_stationaryPoint (hUN : IsUN bounds E) (x : H) :
     D x xStar = E x - EStar := by
   simp [bregman, stationaryValue, hUN.gradient_stationaryPoint]
 
 /-- The negative outer curvature gives the lower quadratic Bregman bound. -/
-theorem IsUN.bregman_lower (hUN : IsUN bounds E g) (x₁ x₂ : H) :
+theorem IsUN.bregman_lower (hUN : IsUN bounds E) (x₁ x₂ : H) :
     -(L₋ / 2) * ‖x₁ - x₂‖ ^ 2 ≤ D x₁ x₂ := by
   have h := GradientMap.taylor_lower_bound_of_inner E g (-L₋)
-    hUN.has_gradient (fun x₁ x₂ => (hUN.outer_inner_bounds x₁ x₂).1) x₂ (x₁ - x₂)
+    hUN.hasGradientAt (fun x₁ x₂ => (hUN.directional_secant_bounds x₁ x₂).1) x₂ (x₁ - x₂)
   simpa only [add_sub_cancel, bregman, neg_div] using h
 
 /-- The positive outer curvature gives the upper quadratic Bregman bound. -/
-theorem IsUN.bregman_upper (hUN : IsUN bounds E g) (x₁ x₂ : H) :
+theorem IsUN.bregman_upper (hUN : IsUN bounds E) (x₁ x₂ : H) :
     D x₁ x₂ ≤ (L₊ / 2) * ‖x₁ - x₂‖ ^ 2 := by
   have h := GradientMap.taylor_upper_bound_of_inner E g L₊
-    hUN.has_gradient (fun x₁ x₂ => (hUN.outer_inner_bounds x₁ x₂).2) x₂ (x₁ - x₂)
+    hUN.hasGradientAt (fun x₁ x₂ => (hUN.directional_secant_bounds x₁ x₂).2) x₂ (x₁ - x₂)
   simpa only [add_sub_cancel, bregman] using h
 
-theorem IsUN.bregman_bounds (hUN : IsUN bounds E g) (x₁ x₂ : H) :
+theorem IsUN.bregman_bounds (hUN : IsUN bounds E) (x₁ x₂ : H) :
     -(L₋ / 2) * ‖x₁ - x₂‖ ^ 2 ≤ D x₁ x₂ ∧
     D x₁ x₂ ≤ L₊ / 2 * ‖x₁ - x₂‖ ^ 2 := by
   exact ⟨hUN.bregman_lower x₁ x₂, hUN.bregman_upper x₁ x₂⟩
 
-theorem IsUN.hasBregmanBounds (hUN : IsUN bounds E g) :
-    HasBregmanBounds E g L₊ L₋ :=
+theorem IsUN.hasBregmanBounds (hUN : IsUN bounds E) :
+    HasBregmanBounds L₊ L₋ E :=
   ⟨hUN.bregman_lower, hUN.bregman_upper⟩
 
 end UN

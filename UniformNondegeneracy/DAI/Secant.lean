@@ -4,15 +4,17 @@ public import UniformNondegeneracy.Analysis.GradientBounds
 public import UniformNondegeneracy.Geometry.GradientInverse
 public import UniformNondegeneracy.Geometry.InverseEnergy
 public import UniformNondegeneracy.DAI.Normalization
+public import UniformNondegeneracy.DAI.Spectral
+public import Mathlib.Analysis.Calculus.MeanValue
 
 @[expose] public section
 
 open scoped RealInnerProductSpace
 
 /-!
-# Secant bounds from balanced descent–ascent inequalities
+# Secant bounds from descent–ascent inequalities
 
-Balanced DAI gives upper and lower secant bounds. After normalization to unit scales and a common weight, the sharp lower norm bound follows from nearly extremal secants of the inverse gradient.
+DAI gives upper and lower secant bounds when the weights are balanced or the energy is C². The balanced case uses normalization and inverse-gradient estimates; the C² case follows from Hessian spectral bounds.
 -/
 
 noncomputable section
@@ -21,7 +23,10 @@ namespace UN.HasDAI
 
 open DAI
 
-variable {H : Type*} [NormedAddCommGroup H] [InnerProductSpace ℝ H]
+variable {H : Type*} [NormedAddCommGroup H] [InnerProductSpace ℝ H] [CompleteSpace H]
+variable {E : H → ℝ}
+
+local notation "g" => gradient E
 
 /-!
 ## Unit scales and the zero-weight case
@@ -29,21 +34,23 @@ variable {H : Type*} [NormedAddCommGroup H] [InnerProductSpace ℝ H]
 At zero weight, the descent and ascent differences are orthogonal, so the normalized gradient preserves distances.
 -/
 
+omit [CompleteSpace H] in
 private lemma inner_sub_add (u v : H) : ⟪u - v, u + v⟫ = ‖u‖ ^ 2 - ‖v‖ ^ 2 := by
   simp only [inner_sub_left, inner_add_right, real_inner_self_eq_norm_sq, real_inner_comm u v]
   ring
 
-private lemma unit_dai {E : H → ℝ} {g : H → H} {r : ℝ} {hr : 0 ≤ r}
-    (hDAI : HasDAI E g Scales.unit (Weights.symmetric r hr)) (x y z : H) :
+private lemma unit_dai {r : ℝ} {hr : 0 ≤ r}
+    (hDAI : HasDAI Scales.unit (Weights.symmetric r hr) E) (x y z : H) :
     ⟪(x - y) - (g x - g y), (x - z) + (g x - g z)⟫ ≤
-      r * (‖x - y‖ ^ 2 / 2 + ‖x - z‖ ^ 2 / 2 - bregman E g x y + bregman E g x z) := by
-  have h := hDAI x y z
+      r * (‖x - y‖ ^ 2 / 2 + ‖x - z‖ ^ 2 / 2 - bregman E x y + bregman E x z) := by
+  have h := hDAI.apply x y z
   simp only [descentStep, ascentStep, gradientStep, Scales.unit, Scales.tauPlus, Scales.tauMinus,
     Weights.symmetric, div_one, one_smul, neg_smul, sub_neg_eq_add, phiPlus, phiMinus, one_mul] at h
   convert h using 1
   · congr 1 <;> abel
   · ring
 
+omit [CompleteSpace H] in
 private lemma cross_inner_zero (a b : H → H)
     (ha : a 0 = 0) (hb : b 0 = 0) (hSum : ∀ x, a x + b x = (2 : ℝ) • x)
     (hCross : ∀ x y z, ⟪a x - a y, b x - b z⟫ ≤ 0) :
@@ -91,8 +98,8 @@ private lemma cross_inner_zero (a b : H → H)
   rw [hNeg, inner_neg_left] at h
   exact le_antisymm (hNonpos x y) (by linarith)
 
-private lemma unit_secant_zero {E : H → ℝ} {g : H → H}
-    (hDAI : HasDAI E g Scales.unit (Weights.symmetric 0 le_rfl)) (x₁ x₂ : H) :
+private lemma unit_secant_zero
+    (hDAI : HasDAI Scales.unit (Weights.symmetric 0 le_rfl) E) (x₁ x₂ : H) :
     ‖x₁ - x₂‖ ^ 2 - ‖g x₁ - g x₂‖ ^ 2 = 0 := by
   let a (x : H) := x - g x + g 0
   let b (x : H) := x + g x - g 0
@@ -113,6 +120,7 @@ private lemma unit_secant_zero {E : H → ℝ} {g : H → H}
 A nearly extremal directional secant controls the inverse gradient and its Bregman difference along the segment.
 -/
 
+omit [CompleteSpace H] in
 private lemma near_extremal_inner (gInv : H → H) (p d : H) (K ε σ : ℝ)
     (hLip : ∀ p₁ p₂, ‖gInv p₁ - gInv p₂‖ ≤ K * ‖p₁ - p₂‖)
     (hσ : σ = 1 ∨ σ = -1)
@@ -141,6 +149,7 @@ private lemma near_extremal_inner (gInv : H → H) (p d : H) (K ε σ : ℝ)
   apply abs_le.mpr
   rcases hσ with rfl | rfl <;> simp only [one_mul, neg_one_mul] at * <;> constructor <;> nlinarith only [hLower, hUpper]
 
+omit [CompleteSpace H] in
 private lemma segment_norm_sq_le (gInv : H → H) (p d : H) (K : ℝ)
     (hK : 0 ≤ K) (hLip : ∀ p₁ p₂, ‖gInv p₁ - gInv p₂‖ ≤ K * ‖p₁ - p₂‖) (a b : ℝ) :
     ‖gInv (p + a • d) - gInv (p + b • d)‖ ^ 2 ≤ K ^ 2 * (a - b) ^ 2 * ‖d‖ ^ 2 := by
@@ -149,6 +158,7 @@ private lemma segment_norm_sq_le (gInv : H → H) (p d : H) (K : ℝ)
   rw [show p + a • d - (p + b • d) = (a - b) • d by module] at hSq
   simpa only [norm_smul, Real.norm_eq_abs, mul_pow, sq_abs, mul_assoc] using hSq
 
+omit [CompleteSpace H] in
 private lemma near_extremal_norm_sq (gInv : H → H) (p d : H) (K ε σ : ℝ)
     (hK : 0 ≤ K) (hσ : σ = 1 ∨ σ = -1)
     (hLip : ∀ p₁ p₂, ‖gInv p₁ - gInv p₂‖ ≤ K * ‖p₁ - p₂‖)
@@ -167,14 +177,12 @@ private lemma near_extremal_norm_sq (gInv : H → H) (p d : H) (K ε σ : ℝ)
     nlinarith only [hSq, hm]
   · simpa only [zero_smul, add_zero, sub_zero] using segment_norm_sq_le gInv p d K hK hLip s 0
 
-variable [CompleteSpace H]
-
 private lemma segment_bregman_error (EInv : H → ℝ) (gInv : H → H) (p d : H) (c ε : ℝ)
     (hGrad : ∀ p, HasGradientAt EInv (gInv p) p)
     (hInner : ∀ s ∈ Set.Icc (0 : ℝ) 1, |⟪gInv (p + s • d) - gInv p, d⟫ - c * s * ‖d‖ ^ 2| ≤ ε * ‖d‖ ^ 2)
     {s : ℝ} (hs : s ∈ Set.Icc (0 : ℝ) 1) :
-    |bregman EInv gInv (p + s • d) p - c / 2 * s ^ 2 * ‖d‖ ^ 2| ≤ ε * s * ‖d‖ ^ 2 := by
-  let f (s : ℝ) := bregman EInv gInv (p + s • d) p - c / 2 * s ^ 2 * ‖d‖ ^ 2
+    |bregman EInv (p + s • d) p - c / 2 * s ^ 2 * ‖d‖ ^ 2| ≤ ε * s * ‖d‖ ^ 2 := by
+  let f (s : ℝ) := bregman EInv (p + s • d) p - c / 2 * s ^ 2 * ‖d‖ ^ 2
   let f' (s : ℝ) := ⟪gInv (p + s • d) - gInv p, d⟫ - c * s * ‖d‖ ^ 2
   have hf (s : ℝ) : HasDerivAt f (f' s) s := by
     have hg := (hGrad (p + s • d)).hasFDerivAt.comp_hasDerivAt s
@@ -182,7 +190,7 @@ private lemma segment_bregman_error (EInv : H → ℝ) (gInv : H → H) (p d : H
     convert ((hg.sub_const (EInv p)).sub ((hasDerivAt_id s).mul_const ⟪gInv p, d⟫)).sub
       ((((hasDerivAt_id s).pow 2).const_mul (c / 2)).mul_const (‖d‖ ^ 2)) using 1
     · ext s
-      simp [f, bregman, real_inner_smul_right]
+      simp [f, bregman, gradient_eq hGrad, real_inner_smul_right]
     · simp only [f', one_smul, InnerProductSpace.toDual_apply_apply, inner_sub_left, Nat.cast_ofNat, mul_one, id_eq]
       ring
   have h := Convex.norm_image_sub_le_of_norm_hasDerivWithin_le
@@ -196,8 +204,8 @@ private lemma segment_bregman_error (EInv : H → ℝ) (gInv : H → H) (p d : H
 Testing the normalized DAI along these segments bounds the optimal inverse Lipschitz constant `K` by $K^{2}(1-r^{2}) \le 1$, where `r` is the common DAI weight.
 -/
 
-private lemma near_extremal_dai {E : H → ℝ} {g : H → H} {r : ℝ} {hr : 0 ≤ r}
-    (hDAI : HasDAI E g Scales.unit (Weights.symmetric r hr))
+private lemma near_extremal_dai {r : ℝ} {hr : 0 ≤ r}
+    (hDAI : HasDAI Scales.unit (Weights.symmetric r hr) E)
     (gInv : H → H) (hRightInverse : Function.RightInverse gInv g)
     (hGradInv : ∀ p, HasGradientAt (inverseEnergy E gInv) (gInv p) p)
     (K ε σ : ℝ) (hK : 0 ≤ K) (hσ : σ = 1 ∨ σ = -1)
@@ -217,7 +225,7 @@ private lemma near_extremal_dai {E : H → ℝ} {g : H → H} {r : ℝ} {hr : 0 
       |⟪v s, d⟫ - σ * K * s * Q| ≤ ε * Q :=
     (near_extremal_inner gInv p d K ε σ hLip hσ hNear hs).2.2
   have hBregman (s : ℝ) (hs : s ∈ Set.Icc (0 : ℝ) 1) :
-      |bregman (inverseEnergy E gInv) gInv (p + s • d) p - σ * K / 2 * s ^ 2 * Q| ≤ ε * s * Q :=
+      |bregman (inverseEnergy E gInv) (p + s • d) p - σ * K / 2 * s ^ 2 * Q| ≤ ε * s * Q :=
     segment_bregman_error (inverseEnergy E gInv) gInv p d (σ * K) ε hGradInv hInner hs
   have hDiff : ‖v a - v b‖ ^ 2 ≤ K ^ 2 * (a - b) ^ 2 * Q := by
     have h := segment_norm_sq_le gInv p d K hK hLip a b
@@ -230,14 +238,14 @@ private lemma near_extremal_dai {E : H → ℝ} {g : H → H} {r : ℝ} {hr : 0 
     have h₂ := mul_le_mul_of_nonneg_left (abs_le.mp (hInner b hb)).2 ha.1
     nlinarith only [h₁, h₂]
   have hModel :
-      ‖v a‖ ^ 2 / 2 + ‖v b‖ ^ 2 / 2 - bregman (inverseEnergy E gInv) gInv (p + a • d) p + bregman (inverseEnergy E gInv) gInv (p + b • d) p ≤
+      ‖v a‖ ^ 2 / 2 + ‖v b‖ ^ 2 / 2 - bregman (inverseEnergy E gInv) (p + a • d) p + bregman (inverseEnergy E gInv) (p + b • d) p ≤
       ((K ^ 2 - σ * K) * a ^ 2 + (K ^ 2 + σ * K) * b ^ 2) / 2 * Q + (a + b) * ε * Q := by
     nlinarith only [(hNorm a ha).2, (hNorm b hb).2,
       (abs_le.mp (hBregman a ha)).1, (abs_le.mp (hBregman b hb)).2]
   have hDAIInv := unit_dai hDAI (gInv p) (gInv (p + a • d)) (gInv (p + b • d))
   rw [hRightInverse p, hRightInverse (p + a • d), hRightInverse (p + b • d)] at hDAIInv
-  rw [← bregman_inverseEnergy E g gInv hRightInverse (p + a • d) p,
-    ← bregman_inverseEnergy E g gInv hRightInverse (p + b • d) p] at hDAIInv
+  rw [← bregman_inverseEnergy hRightInverse hGradInv (p + a • d) p,
+    ← bregman_inverseEnergy hRightInverse hGradInv (p + b • d) p] at hDAIInv
   have hPrimal (s : ℝ) : gInv p - gInv (p + s • d) = -v s := by dsimp [v]; abel
   have hDual (s : ℝ) : p - (p + s • d) = -(s • d) := by abel
   rw [hPrimal a, hPrimal b, hDual a, hDual b] at hDAIInv
@@ -308,8 +316,8 @@ private lemma sharp_constant_of_tests (K r : ℝ) (hK : 1 < K) (hr : 0 < r)
   have h := nonneg_of_mul_nonneg_right hTestNonneg hFactorPos
   nlinarith only [h]
 
-private lemma unit_inverse_lipschitz_bound {E : H → ℝ} {g : H → H} {r : ℝ} {hr : 0 ≤ r}
-    (hDAI : HasDAI E g Scales.unit (Weights.symmetric r hr)) (hrPos : 0 < r)
+private lemma unit_inverse_lipschitz_bound {r : ℝ} {hr : 0 ≤ r}
+    (hDAI : HasDAI Scales.unit (Weights.symmetric r hr) E) (hrPos : 0 < r)
     (gInv : H → H) (hRightInverse : Function.RightInverse gInv g)
     (hGradInv : ∀ p, HasGradientAt (inverseEnergy E gInv) (gInv p) p)
     (L : ℝ) (hL : 0 ≤ L) (hLip : ∀ p₁ p₂, ‖gInv p₁ - gInv p₂‖ ≤ L * ‖p₁ - p₂‖) :
@@ -337,15 +345,15 @@ private lemma unit_inverse_lipschitz_bound {E : H → ℝ} {g : H → H} {r : �
 For $0 < r < 1$, a preliminary lower norm bound makes the gradient invertible. The sharp inverse estimate then gives the lower norm bound needed for the normalized secants, which are transferred back to the original scales.
 -/
 
-private lemma unit_secant_bounds {E : H → ℝ} {g : H → H} {r : ℝ} {hr : 0 ≤ r}
-    (hDAI : HasDAI E g Scales.unit (Weights.symmetric r hr)) (x₁ x₂ : H) :
+private lemma unit_secant_bounds {r : ℝ} {hr : 0 ≤ r}
+    (hDAI : HasDAI Scales.unit (Weights.symmetric r hr) E) (x₁ x₂ : H) :
     0 ≤ ‖x₁ - x₂‖ ^ 2 - ‖g x₁ - g x₂‖ ^ 2 ∧
     ‖x₁ - x₂‖ ^ 2 - ‖g x₁ - g x₂‖ ^ 2 ≤ r ^ 2 * ‖x₁ - x₂‖ ^ 2 := by
   rcases hr.eq_or_lt with hZero | hrPos
   · subst r
     rw [unit_secant_zero hDAI]
     simp
-  have hBounds : HasBregmanBounds E g 1 1 := hDAI.hasBregmanBounds hrPos hrPos
+  have hBounds : HasBregmanBounds 1 1 E := hDAI.hasBregmanBounds hrPos hrPos
   have hLip (x₁ x₂ : H) : ‖g x₁ - g x₂‖ ≤ ‖x₁ - x₂‖ := by
     simpa only [one_mul] using hBounds.norm_sub_le zero_le_one x₁ x₂
   have hOuter := (sq_le_sq₀ (norm_nonneg _) (norm_nonneg _)).mpr (hLip x₁ x₂)
@@ -362,22 +370,15 @@ private lemma unit_secant_bounds {E : H → ℝ} {g : H → H} {r : ℝ} {hr : 0
       have hMargin := mul_nonneg (mul_nonneg hrPos.le hμ.le) (sq_nonneg ‖x₁ - x₂‖)
       nlinarith only [h, hMargin]
     exact (sq_le_sq₀ (mul_nonneg hμ.le (norm_nonneg _)) (norm_nonneg _)).mp hSq
-  have hGrad := hBounds.hasGradientAt
-  have hBijective := GradientMap.bijective_of_bounds E g (1 - r) 1 hGrad hμ (by linarith)
+  have hGrad := hDAI.hasGradientAt
+  have hBijective := GradientMap.bijective_of_bilipschitz E g (1 - r) 1 hGrad hμ
     hLower (fun x₁ x₂ => by simpa only [one_mul] using hLip x₁ x₂)
   let gInv := Function.invFun g
   have hRightInverse : Function.RightInverse gInv g := Function.rightInverse_invFun hBijective.2
   have hLeftInverse : Function.LeftInverse gInv g := Function.leftInverse_invFun hBijective.1
   have hInvLip := GradientMap.inverse_norm_sub_le g gInv (1 - r) hμ hLower hRightInverse
   have hInvNonneg : 0 ≤ (1 - r)⁻¹ := inv_nonneg.mpr hμ.le
-  have hContinuous : Continuous gInv := by
-    have hLipschitz : LipschitzWith ⟨(1 - r)⁻¹, hInvNonneg⟩ gInv := by
-      apply LipschitzWith.of_dist_le_mul
-      intro p₁ p₂
-      simp only [dist_eq_norm]
-      exact_mod_cast hInvLip p₁ p₂
-    exact hLipschitz.continuous
-  have hGradInv := GradientMap.hasGradientAt_inverseEnergy E g gInv (1 - r)⁻¹ hGrad hRightInverse hContinuous hInvLip
+  have hGradInv := GradientMap.hasGradientAt_inverseEnergy E g gInv (1 - r)⁻¹ hGrad hRightInverse hInvLip
   obtain ⟨K, hK, hKLip, hSharp⟩ := unit_inverse_lipschitz_bound hDAI hrPos gInv hRightInverse hGradInv
     (1 - r)⁻¹ hInvNonneg hInvLip
   have hInv := hKLip (g x₁) (g x₂)
@@ -389,12 +390,12 @@ private lemma unit_secant_bounds {E : H → ℝ} {g : H → H} {r : ℝ} {hr : 0
   nlinarith only [hScaled, hSharpScaled]
 
 /-- A balanced DAI bounds the two-point product of descent and ascent differences. -/
-theorem secant_bounds_of_balanced {E : H → ℝ} {g : H → H} {Λ : Scales} {ρ : Weights}
-    (hDAI : HasDAI E g Λ ρ) (hBalanced : ρ.Balanced Λ) (x₁ x₂ : H) :
+theorem secant_bounds_of_balanced {Λ : Scales} {ρ : Weights}
+    (hDAI : HasDAI Λ ρ E) (hBalanced : ρ.Balanced Λ) (x₁ x₂ : H) :
     0 ≤ ⟪descentStep g Λ x₁ - descentStep g Λ x₂, ascentStep g Λ x₁ - ascentStep g Λ x₂⟫ ∧
     ⟪descentStep g Λ x₁ - descentStep g Λ x₂, ascentStep g Λ x₁ - ascentStep g Λ x₂⟫ ≤ ρ.plus * ρ.minus * ‖x₁ - x₂‖ ^ 2 := by
-  have h := unit_secant_bounds (hDAI.normalized hBalanced) x₁ x₂
-  have hIdentity := step_inner_normalized g Λ x₁ x₂ x₂
+  have h := unit_secant_bounds (hDAI.normalized_of_balanced hBalanced) x₁ x₂
+  have hIdentity := step_inner_normalized hDAI.differentiable Λ x₁ x₂ x₂
   rw [step_inner_unit] at hIdentity
   rw [hIdentity] at h
   have hFactor : 0 < Λ.plus * Λ.minus / Λ.radius ^ 2 :=
@@ -406,11 +407,29 @@ theorem secant_bounds_of_balanced {E : H → ℝ} {g : H → H} {Λ : Scales} {�
   nlinarith only [hUpper]
 
 /-- The secant bounds expressed in curvature form. -/
-theorem curvature_secant_bounds_of_balanced {E : H → ℝ} {g : H → H} {Λ : Scales} {ρ : Weights}
-    (hDAI : HasDAI E g Λ ρ) (hBalanced : ρ.Balanced Λ) (x₁ x₂ : H) :
+theorem curvature_secant_bounds_of_balanced {Λ : Scales} {ρ : Weights}
+    (hDAI : HasDAI Λ ρ E) (hBalanced : ρ.Balanced Λ) (x₁ x₂ : H) :
     -(ρ.plus * ρ.minus * (Λ.plus * Λ.minus)) * ‖x₁ - x₂‖ ^ 2 ≤ ⟪g x₁ - g x₂ + Λ.minus • (x₁ - x₂), g x₁ - g x₂ - Λ.plus • (x₁ - x₂)⟫ ∧
     ⟪g x₁ - g x₂ + Λ.minus • (x₁ - x₂), g x₁ - g x₂ - Λ.plus • (x₁ - x₂)⟫ ≤ 0 := by
   have h := hDAI.secant_bounds_of_balanced hBalanced x₁ x₂
+  have hLower := mul_nonneg (mul_nonneg Λ.plus_pos.le Λ.minus_pos.le) h.1
+  have hUpper := mul_le_mul_of_nonneg_left h.2 (mul_nonneg Λ.plus_pos.le Λ.minus_pos.le)
+  rw [step_inner_mul_scales] at hLower hUpper
+  constructor <;> nlinarith only [hLower, hUpper]
+
+/-- For a C² energy, DAI bounds the two-point product of descent and ascent differences. -/
+theorem secant_bounds_of_C2 {Λ : Scales} {ρ : Weights}
+    (hDAI : HasDAI Λ ρ E) (hE : ContDiff ℝ 2 E) (x₁ x₂ : H) :
+    0 ≤ ⟪descentStep g Λ x₁ - descentStep g Λ x₂, ascentStep g Λ x₁ - ascentStep g Λ x₂⟫ ∧
+    ⟪descentStep g Λ x₁ - descentStep g Λ x₂, ascentStep g Λ x₁ - ascentStep g Λ x₂⟫ ≤ ρ.plus * ρ.minus * ‖x₁ - x₂‖ ^ 2 :=
+  (DAI.spectral_iff_secant hE Λ (ρ.plus * ρ.minus)).mp (hDAI.spectral_bounds hE) x₁ x₂
+
+/-- The C² secant bounds expressed in curvature form. -/
+theorem curvature_secant_bounds_of_C2 {Λ : Scales} {ρ : Weights}
+    (hDAI : HasDAI Λ ρ E) (hE : ContDiff ℝ 2 E) (x₁ x₂ : H) :
+    -(ρ.plus * ρ.minus * (Λ.plus * Λ.minus)) * ‖x₁ - x₂‖ ^ 2 ≤ ⟪g x₁ - g x₂ + Λ.minus • (x₁ - x₂), g x₁ - g x₂ - Λ.plus • (x₁ - x₂)⟫ ∧
+    ⟪g x₁ - g x₂ + Λ.minus • (x₁ - x₂), g x₁ - g x₂ - Λ.plus • (x₁ - x₂)⟫ ≤ 0 := by
+  have h := hDAI.secant_bounds_of_C2 hE x₁ x₂
   have hLower := mul_nonneg (mul_nonneg Λ.plus_pos.le Λ.minus_pos.le) h.1
   have hUpper := mul_le_mul_of_nonneg_left h.2 (mul_nonneg Λ.plus_pos.le Λ.minus_pos.le)
   rw [step_inner_mul_scales] at hLower hUpper
